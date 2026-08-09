@@ -3,466 +3,513 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0a0a0b">
-<title>PulseBoard — Server Health</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141417'/%3E%3Cpath d='M5 17h5l2.5-7 5 12 3-8 1.5 3H27' fill='none' stroke='%23e8b257' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#060607">
+<title>PULSEBOARD v2 — Telemetry</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230c0c0e'/%3E%3Cpath d='M4 18h5l2.5-7 5 12 3-8 1.5 3H28' fill='none' stroke='%23f5c14e' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
   :root {
-    --bg: #0a0a0b;
-    --panel: #121214;
-    --panel-2: #17171a;
-    --panel-3: #1c1c20;
-    --line: rgba(255, 255, 255, 0.07);
-    --line-strong: rgba(255, 255, 255, 0.12);
-    --txt: #f2f2f3;
-    --muted: #9a9aa3;
-    --faint: #6b6b74;
-    --acc: #e8b257;            /* gold accent */
-    --acc-soft: #f2c97d;
-    --good: #3dd68c;
-    --warn: #f59e0b;
-    --bad: #f4615f;
-    --r: 12px;
-    --ease: cubic-bezier(0.22, 1, 0.36, 1);
-    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
-    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", sans-serif;
+    --bg:#060607; --panel:#0c0c0e; --panel2:#101013; --panel3:#15151a;
+    --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
+    --txt:#e8e8ea; --muted:#8b8b94; --faint:#565660;
+    --gold:#f5c14e; --gold2:#ffd98a;
+    --emerald:#3dd68c; --amber:#ffab3d; --red:#ff5c5c; --violet:#a78bfa;
+    --mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",sans-serif;
+    --ease:cubic-bezier(.22,1,.36,1);
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-  body {
-    background: var(--bg); color: var(--txt);
-    font-family: var(--sans);
-    min-height: 100vh;
-    position: relative;
-  }
-  /* restrained top glow — depth without decoration */
-  body::before {
-    content: ""; position: fixed; inset: 0 0 auto 0; height: 420px; pointer-events: none;
-    background: radial-gradient(60% 100% at 50% 0%, rgba(232, 178, 87, 0.05), transparent 70%);
-  }
-  .wrap { max-width: 1060px; margin: 0 auto; padding: 26px 22px 64px; position: relative; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
 
-  /* ── header ─────────────────────────────────────── */
-  header { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 26px; }
-  .brand { display: flex; align-items: center; gap: 13px; }
-  .logo {
-    width: 40px; height: 40px; border-radius: 11px; flex: none;
-    background: linear-gradient(150deg, #1d1d21, #101013);
-    border: 1px solid var(--line-strong);
-    display: grid; place-items: center;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 6px 18px rgba(0,0,0,.45);
+  /* ambient: faint grid + vignette */
+  .bg-grid{
+    position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+    background-size:44px 44px;
+    mask-image:radial-gradient(85% 70% at 50% 0%,#000 30%,transparent 100%);
+    -webkit-mask-image:radial-gradient(85% 70% at 50% 0%,#000 30%,transparent 100%);
   }
-  .logo svg { width: 22px; height: 22px; }
-  .wordmark { font-size: 17px; font-weight: 650; letter-spacing: 0.14em; text-transform: uppercase; }
-  .wordmark span { color: var(--acc); }
-  .sub { color: var(--muted); font-size: 12.5px; margin-top: 2px; letter-spacing: .02em; }
-
-  .actions { display: flex; align-items: center; gap: 14px; }
-  .pill {
-    display: inline-flex; align-items: center; gap: 7px;
-    font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
-    color: var(--faint); background: var(--panel); border: 1px solid var(--line);
-    padding: 6px 12px; border-radius: 999px;
-    transition: color .3s var(--ease), border-color .3s var(--ease);
+  .bg-glow{
+    position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(55% 45% at 50% -5%,rgba(245,193,78,.07),transparent 65%);
   }
-  .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-  .pill.live { color: var(--acc); border-color: rgba(232,178,87,.35); }
-  .pill.live .dot { animation: pulse 1.6s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: .35; transform: scale(.72);} }
-
-  .btn {
-    display: inline-flex; align-items: center; gap: 9px;
-    border: 0; cursor: pointer; font-weight: 650; font-size: 13.5px; font-family: var(--sans);
-    padding: 10px 20px; border-radius: 999px; letter-spacing: .02em;
-    color: #14100a;
-    background: linear-gradient(160deg, var(--acc-soft), var(--acc));
-    box-shadow: 0 2px 6px rgba(232,178,87,.18), inset 0 1px 0 rgba(255,255,255,.35);
-    transition: transform .12s var(--ease), box-shadow .25s var(--ease), filter .25s;
+  .scan{
+    position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.5;
+    background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,.12) 3px 4px);
   }
-  .btn:hover { filter: brightness(1.05); box-shadow: 0 4px 14px rgba(232,178,87,.28), inset 0 1px 0 rgba(255,255,255,.35); }
-  .btn:active { transform: scale(.965); }          /* respond on pointer-down */
-  .btn.stop { color: #1a0d0c; background: linear-gradient(160deg, #f57b78, #f4615f); box-shadow: 0 2px 6px rgba(244,97,95,.18), inset 0 1px 0 rgba(255,255,255,.3); }
-  .btn .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-  .btn.live .dot { animation: pulse 1.4s ease-in-out infinite; }
+  .wrap{position:relative;z-index:1;max-width:1160px;margin:0 auto;padding:20px 22px 40px}
 
-  /* ── idle empty state ───────────────────────────── */
-  .idle-state {
-    border: 1px solid var(--line); background: var(--panel);
-    border-radius: var(--r); padding: 48px 24px; text-align: center;
-    margin-bottom: 20px;
+  /* ── command bar ─────────────────────────── */
+  .cmdbar{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    padding:12px 14px;margin-bottom:16px;
+    background:linear-gradient(180deg,rgba(18,18,21,.9),rgba(12,12,14,.9));
+    border:1px solid var(--line);border-radius:10px;
   }
-  .idle-state .glyph {
-    width: 54px; height: 54px; margin: 0 auto 16px; border-radius: 16px;
-    display: grid; place-items: center; color: var(--faint);
-    background: var(--panel-2); border: 1px solid var(--line);
+  .brand{display:flex;align-items:center;gap:12px;min-width:0}
+  .logo{
+    width:34px;height:34px;flex:none;border-radius:8px;
+    display:grid;place-items:center;color:var(--gold);
+    background:linear-gradient(150deg,#1a1a1f,#0d0d10);
+    border:1px solid var(--line2);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 0 18px rgba(245,193,78,.12);
   }
-  .idle-state h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
-  .idle-state p { color: var(--muted); font-size: 13.5px; max-width: 430px; margin: 0 auto; line-height: 1.55; }
-  .idle-state p b { color: var(--acc); font-weight: 600; }
-
-  /* ── grid & cards ───────────────────────────────── */
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
-  .card {
-    background: linear-gradient(180deg, var(--panel), rgba(18,18,20,.6));
-    border: 1px solid var(--line); border-radius: var(--r);
-    padding: 16px 18px; position: relative;
-    transition: border-color .25s var(--ease), transform .25s var(--ease), box-shadow .25s var(--ease);
+  .wordmark{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.22em;white-space:nowrap}
+  .wordmark .v{color:var(--gold)}
+  .wordmark .cursor{display:inline-block;width:7px;height:13px;background:var(--gold);margin-left:6px;vertical-align:-2px;animation:blink 1.1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .meta{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.06em;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cmdraw{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .led{
+    display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);
+    font-size:10.5px;font-weight:700;letter-spacing:.18em;color:var(--faint);
+    border:1px solid var(--line);background:var(--panel2);border-radius:6px;padding:7px 12px;
   }
-  .card:hover { border-color: var(--line-strong); transform: translateY(-1px); box-shadow: 0 10px 30px rgba(0,0,0,.35); }
-  .card h3 {
-    font-size: 10.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .14em;
-    color: var(--faint); margin-bottom: 12px;
-    display: flex; justify-content: space-between; align-items: baseline;
+  .led .l{width:7px;height:7px;border-radius:50%;background:#3a3a42;transition:background .3s,box-shadow .3s}
+  .led.live{color:var(--gold);border-color:rgba(245,193,78,.4)}
+  .led.live .l{background:var(--gold);box-shadow:0 0 10px rgba(245,193,78,.9);animation:blink 1.6s steps(1) infinite}
+  .btn{
+    display:inline-flex;align-items:center;gap:9px;cursor:pointer;border:0;
+    font-family:var(--mono);font-weight:700;font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+    color:#171204;background:linear-gradient(160deg,var(--gold2),var(--gold));
+    padding:11px 22px;border-radius:8px;
+    box-shadow:0 0 0 1px rgba(245,193,78,.4),0 4px 22px rgba(245,193,78,.25),inset 0 1px 0 rgba(255,255,255,.4);
+    transition:transform .12s var(--ease),box-shadow .25s var(--ease),filter .25s;
   }
-  .span2 { grid-column: span 2; }
-  .kv { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--faint); margin-top: 4px; }
-  .kv b { color: var(--txt); font-weight: 550; font-variant-numeric: tabular-nums; }
+  .btn:hover{filter:brightness(1.06);box-shadow:0 0 0 1px rgba(245,193,78,.6),0 6px 28px rgba(245,193,78,.35),inset 0 1px 0 rgba(255,255,255,.4)}
+  .btn:active{transform:scale(.96)}
+  .btn.stop{color:#160d0d;background:linear-gradient(160deg,#ff7a78,var(--red));box-shadow:0 0 0 1px rgba(255,92,92,.4),0 4px 22px rgba(255,92,92,.25),inset 0 1px 0 rgba(255,255,255,.3)}
+  .btn.stop:hover{box-shadow:0 0 0 1px rgba(255,92,92,.6),0 6px 28px rgba(255,92,92,.35),inset 0 1px 0 rgba(255,255,255,.3)}
+  .btn .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+  .btn.live .dot{animation:blink 1.3s steps(1) infinite}
 
-  /* ring gauges */
-  .gauge { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-  .gauge svg { width: 108px; height: 108px; }
-  .gauge .track { fill: none; stroke: rgba(255,255,255,.06); stroke-width: 7; }
-  .gauge .prog {
-    fill: none; stroke: var(--acc); stroke-width: 7; stroke-linecap: round;
-    stroke-dasharray: 326.7; stroke-dashoffset: 326.7;
-    transform: rotate(-90deg); transform-origin: 50% 50%;
-    transition: stroke-dashoffset .7s var(--ease), stroke .4s;
+  /* ── standby ─────────────────────────────── */
+  .standby{
+    border:1px dashed rgba(255,255,255,.14);border-radius:10px;
+    padding:64px 24px;text-align:center;margin-bottom:16px;
+    background:linear-gradient(180deg,rgba(12,12,14,.6),rgba(6,6,7,0));
   }
-  .gauge .prog.warn { stroke: var(--warn); }
-  .gauge .prog.bad  { stroke: var(--bad); }
-  .gauge .prog.good { stroke: var(--good); }
-  .gauge-val { font-family: var(--mono); font-size: 24px; font-weight: 600; margin-top: -72px; font-variant-numeric: tabular-nums; }
-  .gauge-val small { font-size: 12px; color: var(--faint); font-weight: 500; margin-left: 1px; }
-  .gauge .g-name { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); font-weight: 650; }
-  .gauge-sub { font-size: 11px; color: var(--faint); margin-top: 2px; font-variant-numeric: tabular-nums; }
-  .gauge-rows { width: 100%; margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .standby .prompt{font-family:var(--mono);font-size:clamp(14px,2.2vw,18px);color:var(--muted)}
+  .standby .prompt b{color:var(--gold);font-weight:700}
+  .standby .prompt .blk{display:inline-block;width:9px;height:16px;background:var(--gold);vertical-align:-2px;margin-left:4px;animation:blink 1.1s steps(1) infinite}
+  .standby .hint{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.14em;margin-top:12px;text-transform:uppercase}
 
-  /* network */
-  .net-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
-  .net-if { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
-  .net-if .ifname { font-family: var(--mono); font-size: 12px; color: var(--acc); letter-spacing: .04em; }
-  .net-if .ifname .tag { color: var(--faint); font-size: 10px; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; margin-left: 6px; letter-spacing: .08em; }
-  .net-if .rate { font-family: var(--mono); font-size: 19px; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
-  .net-if .rate .up { color: var(--muted); font-size: 13px; }
-  .net-if .meta { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
-  canvas { width: 100%; height: 56px; display: block; margin-top: 10px; }
-
-  /* tables */
-  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  th { text-align: left; color: var(--faint); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .12em; padding: 5px 10px; border-bottom: 1px solid var(--line); }
-  td { padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,.04); font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
-  tbody tr { transition: background .15s; }
-  tbody tr:hover { background: rgba(255,255,255,.025); }
-  td .cmd { color: var(--faint); font-family: var(--sans); font-size: 11.5px; }
-
-  /* services */
-  .chip {
-    display: inline-block; padding: 4px 12px; border-radius: 7px; font-size: 12px; font-weight: 550;
-    background: var(--panel-2); color: var(--txt); border: 1px solid var(--line);
-    margin: 0 6px 8px 0; transition: border-color .2s, color .2s;
+  /* ── hero telemetry ──────────────────────── */
+  .hero{
+    background:linear-gradient(180deg,var(--panel),rgba(12,12,14,.4));
+    border:1px solid var(--line);border-radius:10px;padding:14px 16px 10px;margin-bottom:14px;
   }
-  .chip:hover { border-color: rgba(232,178,87,.4); }
-  .chip a { color: inherit; text-decoration: none; }
-  .chip a:hover { color: var(--acc); }
-  .svc-note { font-size: 12px; color: var(--faint); margin-top: 6px; line-height: 1.6; }
+  .win{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .win .dots{display:flex;gap:5px}
+  .win .dots i{width:9px;height:9px;border-radius:50%}
+  .win .dots i:nth-child(1){background:var(--red);opacity:.85}
+  .win .dots i:nth-child(2){background:var(--gold);opacity:.85}
+  .win .dots i:nth-child(3){background:var(--emerald);opacity:.85}
+  .win .title{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.2em;color:var(--faint);text-transform:uppercase;margin-left:6px}
+  .win .legend{margin-left:auto;display:flex;gap:14px;flex-wrap:wrap}
+  .win .legend span{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em}
+  .win .legend i{width:7px;height:7px;border-radius:2px}
+  .chartbox{position:relative;height:210px}
+  #chart{width:100%;height:100%;display:block}
+  .chart-note{position:absolute;right:8px;bottom:6px;font-family:var(--mono);font-size:9.5px;color:var(--faint);letter-spacing:.1em}
 
-  footer { margin-top: 30px; color: var(--faint); font-size: 11.5px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; letter-spacing: .02em; }
-  footer b { color: var(--muted); font-weight: 550; }
-
-  .dim { opacity: .4; transition: opacity .5s var(--ease); }
-  .hidden { display: none; }
-
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation: none !important; transition: none !important; }
+  /* big numbers strip */
+  .strip{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:12px;
   }
+  .stat{
+    border:1px solid var(--line);background:var(--panel2);border-radius:8px;
+    padding:8px 12px 9px;position:relative;overflow:hidden;
+  }
+  .stat .k{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--faint);text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+  .stat .k i{width:6px;height:6px;border-radius:50%;background:#3a3a42}
+  .stat .v{font-family:var(--mono);font-size:clamp(17px,2.4vw,23px);font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+  .stat .v small{font-size:11px;color:var(--faint);font-weight:500}
+  .stat.ok .k i{background:var(--emerald);box-shadow:0 0 8px rgba(61,214,140,.8)}
+  .stat.warn .k i{background:var(--amber);box-shadow:0 0 8px rgba(255,171,61,.8)}
+  .stat.bad .k i{background:var(--red);box-shadow:0 0 8px rgba(255,92,92,.8)}
+  .stat.ok .v{color:var(--emerald)}
+  .stat.warn .v{color:var(--amber)}
+  .stat.bad .v{color:var(--red)}
+  .stat.gold .v{color:var(--gold)}
+
+  /* ── modules grid ────────────────────────── */
+  .mods{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+  .mod{
+    grid-column:span 3;background:linear-gradient(180deg,var(--panel),rgba(12,12,14,.5));
+    border:1px solid var(--line);border-radius:10px;padding:0;overflow:hidden;
+    transition:border-color .25s var(--ease),transform .25s var(--ease),box-shadow .25s var(--ease);
+  }
+  .mod:hover{border-color:var(--line2);transform:translateY(-1px);box-shadow:0 12px 34px rgba(0,0,0,.5)}
+  .mod.w6{grid-column:span 6}.mod.w12{grid-column:span 12}
+  .mod .mhead{
+    display:flex;align-items:center;gap:8px;padding:9px 12px;
+    border-bottom:1px solid var(--line);background:rgba(255,255,255,.015);
+  }
+  .mod .mhead .tag{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.2em;color:var(--gold);text-transform:uppercase}
+  .mod .mhead .desc{font-family:var(--mono);font-size:9.5px;color:var(--faint);letter-spacing:.08em;margin-left:auto;text-transform:uppercase}
+  .mod .mbody{padding:12px}
+
+  .mrow{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:11.5px;color:var(--muted);padding:5px 0;border-bottom:1px dashed rgba(255,255,255,.05)}
+  .mrow:last-child{border-bottom:0}
+  .mrow b{color:var(--txt);font-weight:600;font-variant-numeric:tabular-nums}
+  .mrow b.gold{color:var(--gold)} .mrow b.green{color:var(--emerald)} .mrow b.orange{color:var(--amber)} .mrow b.red{color:var(--red)}
+  .hbar{height:4px;border-radius:2px;background:#1a1a20;overflow:hidden;margin:4px 0 2px}
+  .hbar>i{display:block;height:100%;border-radius:2px;background:linear-gradient(90deg,var(--gold),var(--gold2));transition:width .6s var(--ease)}
+  .hbar.ok>i{background:linear-gradient(90deg,#2bb87a,var(--emerald))}
+  .hbar.warn>i{background:linear-gradient(90deg,#f08a1f,var(--amber))}
+  .hbar.bad>i{background:linear-gradient(90deg,#e5403e,var(--red))}
+
+  .ifrow{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.05)}
+  .ifrow:last-child{border-bottom:0}
+  .ifrow .n{color:var(--gold)}
+  .ifrow .r{color:var(--emerald);font-variant-numeric:tabular-nums}
+  .ifrow .t{color:var(--faint);font-variant-numeric:tabular-nums}
+
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+  th{text-align:left;font-size:9px;letter-spacing:.16em;color:var(--faint);text-transform:uppercase;font-weight:600;padding:4px 8px;border-bottom:1px solid var(--line)}
+  td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);font-variant-numeric:tabular-nums}
+  tbody tr{transition:background .15s}
+  tbody tr:hover{background:rgba(255,255,255,.03)}
+  td .cmd{color:var(--faint);font-family:var(--sans);font-size:10.5px}
+  td.gold{color:var(--gold)} td.green{color:var(--emerald)} td.orange{color:var(--amber)}
+
+  .chip{
+    display:inline-block;font-family:var(--mono);font-size:11px;color:var(--muted);
+    background:var(--panel2);border:1px solid var(--line);border-radius:6px;
+    padding:5px 11px;margin:0 6px 8px 0;transition:border-color .2s,color .2s;
+  }
+  .chip:hover{border-color:rgba(245,193,78,.45)}
+  .chip a{color:inherit;text-decoration:none}
+  .chip a:hover{color:var(--gold)}
+  .chip .up{color:var(--emerald)}
+
+  /* ── ticker ──────────────────────────────── */
+  .ticker{
+    margin-top:14px;background:#070708;border:1px solid var(--line);border-radius:8px;
+    font-family:var(--mono);font-size:10.5px;color:var(--faint);overflow:hidden;
+  }
+  .ticker .thead{
+    display:flex;gap:8px;align-items:center;padding:6px 12px;
+    border-bottom:1px solid var(--line);background:rgba(255,255,255,.015);
+    font-size:9.5px;letter-spacing:.2em;color:var(--faint);text-transform:uppercase;
+  }
+  .ticker .thead .live-dot{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);animation:blink 1.4s steps(1) infinite}
+  .ticker .lines{padding:6px 12px;max-height:88px;overflow:hidden}
+  .ticker .line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.75}
+  .ticker .line .t{color:var(--faint)}
+  .ticker .line .ok{color:var(--emerald)}
+  .ticker .line .w{color:var(--amber)}
+  .ticker .line .e{color:var(--red)}
+
+  footer{margin-top:18px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-family:var(--mono);font-size:10px;color:var(--faint);letter-spacing:.08em}
+  .dim{opacity:.35;transition:opacity .5s var(--ease)}
+  .hidden{display:none}
+  .fadein{animation:fadein .5s var(--ease) both}
+  @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  @media (max-width:900px){.mod{grid-column:span 6}}
+  @media (max-width:560px){.mod{grid-column:span 12}.chartbox{height:160px}}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
+<div class="bg-grid"></div><div class="bg-glow"></div><div class="scan"></div>
 <div class="wrap">
-  <header>
+
+  <!-- command bar -->
+  <div class="cmdbar">
     <div class="brand">
-      <div class="logo" aria-hidden="true">
-        <svg viewBox="0 0 32 32" fill="none"><path d="M4 17h5l2.5-7 5 12 3-8 1.5 3H28" stroke="#e8b257" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="logo">
+        <svg width="18" height="18" viewBox="0 0 32 32" fill="none"><path d="M4 18h5l2.5-7 5 12 3-8 1.5 3H28" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
       <div>
-        <div class="wordmark">Pulse<span>Board</span></div>
-        <div class="sub" id="hostSub">server health · on demand</div>
+        <div class="wordmark">PULSE<span class="v">BOARD</span><span class="cursor"></span></div>
+        <div class="meta" id="hostLine">waiting for uplink…</div>
       </div>
     </div>
-    <div class="actions">
-      <span class="pill" id="statusPill"><span class="dot"></span><span id="statusTxt">Idle</span></span>
-      <button class="btn" id="monBtn" aria-pressed="false"><span class="dot"></span><span id="monLabel">Start Monitoring</span></button>
+    <div class="cmdraw">
+      <span class="led" id="led"><span class="l"></span><span id="ledTxt">IDLE</span></span>
+      <button class="btn" id="monBtn" aria-pressed="false"><span class="dot"></span><span id="monLabel">START MONITOR</span></button>
     </div>
-  </header>
-
-  <div class="idle-state" id="idleState">
-    <div class="glyph" aria-hidden="true">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 12h4l2-5 4 10 2.5-6.5L17 12h4"/></svg>
-    </div>
-    <h2>Dashboard is idle</h2>
-    <p>Nothing is being sampled right now. Press <b>Start Monitoring</b> to collect live stats — polling stops the moment you stop, so the server stays quiet.</p>
   </div>
 
-  <main class="grid dim" id="dash">
+  <!-- standby -->
+  <div class="standby" id="standby">
+    <div class="prompt"><b>●</b> STANDBY — telemetry offline. press <b>[ START MONITOR ]</b> to begin sampling<span class="blk"></span></div>
+    <div class="hint">zero-idle design · no background sampling · data only while you watch</div>
+  </div>
 
-    <!-- gauges -->
-    <section class="card">
-      <h3>Processor</h3>
-      <div class="gauge">
-        <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="52"/><circle class="prog" id="cpuRing" cx="60" cy="60" r="52"/></svg>
-        <div class="gauge-val" id="cpuVal">—<small>%</small></div>
-        <div class="g-name">CPU</div>
-        <div class="gauge-rows">
-          <div class="kv"><span>cores</span><b id="cpuCores">—</b></div>
-          <div class="kv"><span>load 1 / 5 / 15m</span><b id="load">—</b></div>
+  <div id="dash" class="dim">
+
+    <!-- hero chart -->
+    <section class="hero fadein">
+      <div class="win">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <span class="title">REAL-TIME TELEMETRY</span>
+        <div class="legend">
+          <span><i style="background:var(--gold)"></i>CPU</span>
+          <span><i style="background:var(--emerald)"></i>MEM</span>
+          <span><i style="background:var(--amber)"></i>NET↓</span>
+          <span><i style="background:var(--violet)"></i>NET↑</span>
         </div>
+      </div>
+      <div class="chartbox">
+        <canvas id="chart"></canvas>
+        <span class="chart-note">T-90s · normalized % of peak</span>
+      </div>
+      <div class="strip" id="strip">
+        <div class="stat" id="sCpu"><div class="k"><span>CPU</span><i></i></div><div class="v">—<small>%</small></div></div>
+        <div class="stat" id="sMem"><div class="k"><span>MEM</span><i></i></div><div class="v">—<small>%</small></div></div>
+        <div class="stat" id="sSwap"><div class="k"><span>SWAP</span><i></i></div><div class="v">—<small>%</small></div></div>
+        <div class="stat" id="sDisk"><div class="k"><span>DISK</span><i></i></div><div class="v">—<small>%</small></div></div>
+        <div class="stat gold" id="sNetD"><div class="k"><span>NET ↓</span><i></i></div><div class="v">—</div></div>
+        <div class="stat gold" id="sNetU"><div class="k"><span>NET ↑</span><i></i></div><div class="v">—</div></div>
       </div>
     </section>
 
-    <section class="card">
-      <h3>Working Set</h3>
-      <div class="gauge">
-        <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="52"/><circle class="prog" id="memRing" cx="60" cy="60" r="52"/></svg>
-        <div class="gauge-val" id="memVal">—<small>%</small></div>
-        <div class="g-name">Memory</div>
-        <div class="gauge-rows">
-          <div class="kv"><span>used</span><b id="memUsed">—</b></div>
-          <div class="kv"><span>available</span><b id="memAvail">—</b></div>
+    <!-- modules -->
+    <div class="mods">
+
+      <section class="mod fadein">
+        <div class="mhead"><span class="tag">PROC</span><span class="desc">processor</span></div>
+        <div class="mbody">
+          <div class="mrow"><span>cores</span><b id="mCores">—</b></div>
+          <div class="mrow"><span>load 1m</span><b id="mLoad1">—</b></div>
+          <div class="mrow"><span>load 5m</span><b id="mLoad5">—</b></div>
+          <div class="mrow"><span>load 15m</span><b id="mLoad15">—</b></div>
+          <div class="mrow"><span>uptime</span><b id="mUp">—</b></div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="card">
-      <h3>Overflow</h3>
-      <div class="gauge">
-        <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="52"/><circle class="prog" id="swapRing" cx="60" cy="60" r="52"/></svg>
-        <div class="gauge-val" id="swapVal">—<small>%</small></div>
-        <div class="g-name">Swap</div>
-        <div class="gauge-rows">
-          <div class="kv"><span>used</span><b id="swapUsed">—</b></div>
-          <div class="kv"><span>free</span><b id="swapFree">—</b></div>
+      <section class="mod fadein">
+        <div class="mhead"><span class="tag">MEM</span><span class="desc">working set</span></div>
+        <div class="mbody">
+          <div class="hbar" id="memBar"><i style="width:0%"></i></div>
+          <div class="mrow"><span>used</span><b id="mMemUsed">—</b></div>
+          <div class="mrow"><span>available</span><b class="green" id="mMemAvail">—</b></div>
+          <div class="mrow"><span>buff/cache</span><b id="mMemCache">—</b></div>
+          <div class="mrow"><span>total</span><b id="mMemTotal">—</b></div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="card">
-      <h3>Storage</h3>
-      <div class="gauge">
-        <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="52"/><circle class="prog" id="diskRing" cx="60" cy="60" r="52"/></svg>
-        <div class="gauge-val" id="diskVal">—<small>%</small></div>
-        <div class="g-name">Disk</div>
-        <div class="gauge-rows">
-          <div class="kv"><span>used</span><b id="diskUsed">—</b></div>
-          <div class="kv"><span>available</span><b id="diskAvail">—</b></div>
+      <section class="mod fadein">
+        <div class="mhead"><span class="tag">SWAP</span><span class="desc">overflow</span></div>
+        <div class="mbody">
+          <div class="hbar" id="swapBar"><i style="width:0%"></i></div>
+          <div class="mrow"><span>used</span><b id="mSwapUsed">—</b></div>
+          <div class="mrow"><span>free</span><b class="green" id="mSwapFree">—</b></div>
+          <div class="mrow"><span>total</span><b id="mSwapTotal">—</b></div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- network -->
-    <section class="card span2">
-      <h3>Network <span style="font-family:var(--mono);font-size:14px;color:var(--txt);text-transform:none;letter-spacing:0" id="netTotal">↓ — &nbsp;↑ —</span></h3>
-      <div class="net-row" id="netRow"></div>
-    </section>
+      <section class="mod fadein">
+        <div class="mhead"><span class="tag">NET</span><span class="desc">interfaces</span></div>
+        <div class="mbody" id="mNet"></div>
+      </section>
 
-    <!-- disk io -->
-    <section class="card span2">
-      <h3>Disk I/O <span style="color:var(--faint);font-weight:500" id="ioSub"></span></h3>
-      <table>
-        <thead><tr><th>Device</th><th>Read</th><th>Write</th><th>Total read</th><th>Total written</th></tr></thead>
-        <tbody id="ioBody"></tbody>
-      </table>
-    </section>
+      <section class="mod w6 fadein">
+        <div class="mhead"><span class="tag">IO</span><span class="desc">block devices · live</span></div>
+        <div class="mbody" style="padding:8px 0 0">
+          <table><thead><tr><th>Dev</th><th>Rd</th><th>Wr</th><th>Total rd</th><th>Total wr</th></tr></thead><tbody id="ioBody"></tbody></table>
+        </div>
+      </section>
 
-    <!-- processes -->
-    <section class="card span2">
-      <h3>Top Processes</h3>
-      <table>
-        <thead><tr><th>PID</th><th>Process</th><th>CPU</th><th>MEM</th><th>Command</th></tr></thead>
-        <tbody id="procBody"></tbody>
-      </table>
-    </section>
+      <section class="mod w6 fadein">
+        <div class="mhead"><span class="tag">TOP</span><span class="desc">processes by cpu</span></div>
+        <div class="mbody" style="padding:8px 0 0">
+          <table><thead><tr><th>PID</th><th>Proc</th><th>CPU</th><th>MEM</th><th>Command</th></tr></thead><tbody id="procBody"></tbody></table>
+        </div>
+      </section>
 
-    <!-- services -->
-    <section class="card span2">
-      <h3>Deployed Services</h3>
-      <div id="svcChips"></div>
-      <div class="svc-note" id="svcNote"></div>
-    </section>
-  </main>
+      <section class="mod w12 fadein">
+        <div class="mhead"><span class="tag">SVC</span><span class="desc">deployed services</span></div>
+        <div class="mbody" id="svcBox"></div>
+      </section>
+    </div>
+
+    <!-- ticker -->
+    <div class="ticker">
+      <div class="thead"><span class="live-dot"></span>EVENT LOG</div>
+      <div class="lines" id="logLines"></div>
+    </div>
+  </div>
 
   <footer>
-    <span id="footLeft">PulseBoard · zero-idle monitoring</span>
-    <span id="footRight"></span>
+    <span id="fLeft">PULSEBOARD v2 · ZERO-IDLE TELEMETRY</span>
+    <span id="fRight"></span>
   </footer>
 </div>
 
 <script>
 'use strict';
-const $ = (id) => document.getElementById(id);
-const btn = $('monBtn'), label = $('monLabel'), pill = $('statusPill'), pillTxt = $('statusTxt');
-let timer = null, hasData = false;
-const history = { rx: [], tx: [] };
-const MAX = 60;
-const RING_C = 326.7;
-
-const fmtB = (b) => {
-  if (b >= 1024 ** 3) return (b / 1024 ** 3).toFixed(2) + ' GiB';
-  if (b >= 1024 ** 2) return (b / 1024 ** 2).toFixed(1) + ' MiB';
-  if (b >= 1024) return (b / 1024).toFixed(0) + ' KiB';
-  return b + ' B';
-};
-const fmtRate = (bps) => {
-  if (bps >= 1024 ** 3) return (bps / 1024 ** 3).toFixed(2) + ' GB/s';
-  if (bps >= 1024 ** 2) return (bps / 1024 ** 2).toFixed(1) + ' MB/s';
-  if (bps >= 1024) return (bps / 1024).toFixed(0) + ' KB/s';
-  return bps + ' B/s';
-};
-const fmtDur = (s) => {
-  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
-  if (d) return `${d}d ${h}h ${m}m`;
-  if (h) return `${h}h ${m}m`;
-  return `${m}m`;
-};
-
-function setRing(ring, valEl, pct, suffix) {
-  const clamped = Math.max(0, Math.min(100, pct));
-  ring.classList.remove('good', 'warn', 'bad');
-  ring.classList.add(clamped >= 85 ? 'bad' : clamped >= 65 ? 'warn' : 'good');
-  ring.style.strokeDashoffset = RING_C * (1 - clamped / 100);
-  valEl.innerHTML = (pct === null || pct === undefined ? '—' : Math.round(pct)) + (suffix || '');
-}
-
-function drawSpark(canvas, arr, color) {
-  const ctx = canvas.getContext('2d');
-  const w = canvas.width = canvas.clientWidth * devicePixelRatio;
-  const h = canvas.height = canvas.clientHeight * devicePixelRatio;
-  ctx.clearRect(0, 0, w, h);
-  if (!arr.length) return;
-  const max = Math.max(...arr, 1);
-  const step = w / (MAX - 1);
-  // soft gradient fill under the line
-  const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, 'rgba(232,178,87,.20)');
-  grad.addColorStop(1, 'rgba(232,178,87,0)');
-  ctx.beginPath();
-  arr.forEach((v, i) => { const x = i * step; const y = h - (v / max) * (h - 6) - 3; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
-  ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
-  ctx.beginPath();
-  arr.forEach((v, i) => { const x = i * step; const y = h - (v / max) * (h - 6) - 3; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
-  ctx.strokeStyle = color; ctx.lineWidth = 1.8 * devicePixelRatio; ctx.lineJoin = 'round'; ctx.stroke();
-}
-
-const SERVICES = [
-  { name: 'madhur.dev', url: 'https://madhur.dev', desc: 'Portfolio' },
-  { name: 'aa.madhur.dev', url: 'https://aa.madhur.dev', desc: 'Aravalli Ayurveda' },
-  { name: 'ai.madhur.dev', url: 'https://ai.madhur.dev', desc: 'Open WebUI' },
-  { name: 'meetings.madhur.dev', url: 'https://meetings.madhur.dev', desc: 'SpeakInsights' },
-  { name: 'nav.madhur.dev', url: 'https://nav.madhur.dev', desc: 'NavDashboard' },
-  { name: 'n8n.madhur.dev', url: 'https://n8n.madhur.dev', desc: 'n8n' },
-  { name: 'ollama.madhur.dev', url: 'https://ollama.madhur.dev', desc: 'Ollama API' },
-  { name: 'docker.madhur.dev', url: 'https://docker.madhur.dev', desc: 'Portainer' },
-  { name: 'code.madhur.dev', url: 'https://code.madhur.dev', desc: 'Code server' },
-  { name: 'rdp.madhur.dev', url: 'https://rdp.madhur.dev', desc: 'Remote Desktop' },
-  { name: 'Supabase', desc: 'local stack' },
-  { name: 'OmniRoute', desc: 'AI gateway :20128' },
-  { name: 'Hermes', desc: 'agent gateway' },
+const $=id=>document.getElementById(id);
+const btn=$('monBtn'),label=$('monLabel'),led=$('led'),ledTxt=$('ledTxt');
+let timer=null,log=[];
+const MAX=90;
+const H={cpu:[],mem:[],rx:[],tx:[]};
+const SERIES=[
+  {key:'cpu',color:'#f5c14e',fill:'rgba(245,193,78,',label:'CPU'},
+  {key:'mem',color:'#3dd68c',fill:'rgba(61,214,140,',label:'MEM'},
+  {key:'rx',color:'#ffab3d',fill:'rgba(255,171,61,',label:'NET↓'},
+  {key:'tx',color:'#a78bfa',fill:'rgba(167,139,250,',label:'NET↑'},
 ];
-$('svcChips').innerHTML = SERVICES.map(s =>
-  `<span class="chip" title="${s.desc}">${s.url ? `<a href="${s.url}" target="_blank" rel="noopener">${s.name}</a>` : s.name}</span>`
-).join('');
-$('svcNote').textContent = 'From server inspection + obsidian deployment notes · 2026-08-10';
 
-function render(d) {
-  hasData = true;
-  $('hostSub').textContent = `${d.hostname} · ${d.os} · up ${fmtDur(d.uptime_s)}`;
-  $('footLeft').innerHTML = `PulseBoard · <b>${d.hostname}</b> · up ${fmtDur(d.uptime_s)}`;
-  $('footRight').textContent = `updated ${new Date(d.ts).toLocaleTimeString()}`;
+const fmtB=b=>{if(b>=1024**3)return(b/1024**3).toFixed(2)+' GiB';if(b>=1024**2)return(b/1024**2).toFixed(1)+' MiB';if(b>=1024)return(b/1024).toFixed(0)+' KiB';return b+' B'};
+const fmtRate=b=>{if(b>=1024**3)return(b/1024**3).toFixed(2)+' GB/s';if(b>=1024**2)return(b/1024**2).toFixed(1)+' MB/s';if(b>=1024)return(b/1024).toFixed(0)+' KB/s';return b+' B/s'};
+const fmtDur=s=>{const d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return d?`${d}d ${h}h ${m}m`:h?`${h}h ${m}m`:`${m}m`};
+const cls=p=>p>=85?'bad':p>=65?'warn':'ok';
 
-  setRing($('cpuRing'), $('cpuVal'), d.cpu_usage_pct, '<small>%</small>');
-  $('cpuCores').textContent = d.cores;
-  $('load').textContent = d.loadavg.join(' / ');
-
-  setRing($('memRing'), $('memVal'), d.mem.usage_pct, '<small>%</small>');
-  $('memUsed').textContent = fmtB(d.mem.used) + ' / ' + fmtB(d.mem.total);
-  $('memAvail').textContent = fmtB(d.mem.available);
-
-  setRing($('swapRing'), $('swapVal'), d.mem.swap.usage_pct, '<small>%</small>');
-  $('swapUsed').textContent = fmtB(d.mem.swap.used) + ' / ' + fmtB(d.mem.swap.total);
-  $('swapFree').textContent = fmtB(d.mem.swap.free);
-
-  const root = d.disk.find(x => x.mount === '/') || d.disk[0] || {};
-  setRing($('diskRing'), $('diskVal'), root.use_pct ?? null, '<small>%</small>');
-  $('diskUsed').textContent = fmtB(root.used ?? 0) + ' / ' + fmtB(root.size ?? 0);
-  $('diskAvail').textContent = fmtB(root.avail ?? 0);
-  $('ioSub').textContent = d.disk.map(x => `${x.mount} ${x.use_pct}%`).join(' · ');
-
-  const total = d.net.total;
-  $('netTotal').innerHTML = `↓ ${fmtRate(total.rx_bps)} &nbsp;·&nbsp; ↑ ${fmtRate(total.tx_bps)}`;
-  history.rx.push(total.rx_bps); history.tx.push(total.tx_bps);
-  if (history.rx.length > MAX) { history.rx.shift(); history.tx.shift(); }
-  $('netRow').innerHTML = d.net.interfaces.map(n => `
-    <div class="net-if">
-      <div class="ifname">${n.name}${n.link_mbps ? `<span class="tag">${n.link_mbps} Mb/s</span>` : ''}</div>
-      <div class="rate">↓ ${fmtRate(n.rx_bps)} <span class="up">↑ ${fmtRate(n.tx_bps)}</span></div>
-      <div class="meta">lifetime ↓ ${fmtB(n.rx_total_gb * 1024 ** 3)} · ↑ ${fmtB(n.tx_total_gb * 1024 ** 3)}</div>
-      <canvas data-c="rx"></canvas>
-    </div>`).join('') || '<div class="svc-note">no non-loopback interfaces</div>';
-  requestAnimationFrame(() => {
-    document.querySelectorAll('.net-if canvas').forEach(cv => drawSpark(cv, history.rx, '#e8b257'));
+function drawChart(){
+  const cv=$('chart');const ctx=cv.getContext('2d');
+  const W=cv.width=cv.clientWidth*devicePixelRatio;
+  const Hh=cv.height=cv.clientHeight*devicePixelRatio;
+  ctx.clearRect(0,0,W,Hh);
+  const n=H.cpu.length;if(!n)return;
+  const pad=6,step=W/(MAX-1);
+  // grid
+  ctx.strokeStyle='rgba(255,255,255,.045)';ctx.lineWidth=1;
+  for(let g=0;g<=4;g++){const y=pad+(Hh-pad*2)*g/4;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+  // series: normalize to own peak
+  SERIES.forEach(s=>{
+    const arr=H[s.key];if(!arr.length)return;
+    const peak=Math.max(...arr,1);
+    const max=peak||1;
+    ctx.beginPath();
+    arr.forEach((v,i)=>{const x=(MAX-n+i)*step;const y=Hh-pad-(v/max)*(Hh-pad*2);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
+    // fill
+    const g=ctx.createLinearGradient(0,0,0,Hh);
+    g.addColorStop(0,s.fill+'.16)');g.addColorStop(1,s.fill+'0)');
+    ctx.lineTo(W,Hh);ctx.lineTo((MAX-n)*step,Hh);ctx.closePath();ctx.fillStyle=g;ctx.fill();
+    // stroke w/ glow
+    ctx.beginPath();
+    arr.forEach((v,i)=>{const x=(MAX-n+i)*step;const y=Hh-pad-(v/max)*(Hh-pad*2);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
+    ctx.strokeStyle=s.color;ctx.lineWidth=1.6*devicePixelRatio;ctx.lineJoin='round';
+    ctx.shadowColor=s.color;ctx.shadowBlur=7*devicePixelRatio;ctx.stroke();ctx.shadowBlur=0;
   });
+  // live edge marker
+  const ex=W-pad/2;
+  ctx.strokeStyle='rgba(245,193,78,.5)';ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(ex,pad);ctx.lineTo(ex,Hh-pad);ctx.stroke();ctx.setLineDash([]);
+}
 
-  $('ioBody').innerHTML = d.diskio.map(x =>
-    `<tr><td>${x.dev}</td><td style="color:var(--good)">${fmtRate(x.r_kbps * 1024)}</td><td style="color:var(--warn)">${fmtRate(x.w_kbps * 1024)}</td><td>${x.r_total_gb} GB</td><td>${x.w_total_gb} GB</td></tr>`
-  ).join('') || '<tr><td colspan="5" style="color:var(--faint)">no block devices</td></tr>';
+function setStat(id,pct,clsName,suffix){
+  const el=$(id);el.className='stat '+clsName;
+  el.querySelector('.v').innerHTML=(pct===null||pct===undefined?'—':Math.round(pct))+(suffix||'');
+}
+function setBar(el,pct){
+  el.className='hbar '+cls(pct);
+  el.firstElementChild.style.width=Math.min(100,Math.max(0,pct))+'%';
+}
 
-  $('procBody').innerHTML = d.procs.map(p =>
-    `<tr><td>${p.pid}</td><td>${p.name}</td><td>${p.cpu}%</td><td>${p.mem}%</td><td class="cmd">${p.cmd}</td></tr>`
+function render(d){
+  // header
+  $('hostLine').textContent=`${d.hostname} · ${d.os} · up ${fmtDur(d.uptime_s)}`;
+  $('fLeft').textContent=`PULSEBOARD v2 · ${d.hostname} · UPTIME ${fmtDur(d.uptime_s)}`;
+  $('fRight').textContent=`last sync ${new Date(d.ts).toLocaleTimeString()} IST`;
+
+  // history
+  H.cpu.push(d.cpu_usage_pct);H.mem.push(d.mem.usage_pct);
+  H.rx.push(d.net.total.rx_bps/1024);H.tx.push(d.net.total.tx_bps/1024);
+  if(H.cpu.length>MAX){H.cpu.shift();H.mem.shift();H.rx.shift();H.tx.shift()}
+  drawChart();
+
+  // strip
+  setStat('sCpu',d.cpu_usage_pct,cls(d.cpu_usage_pct),'<small>%</small>');
+  setStat('sMem',d.mem.usage_pct,cls(d.mem.usage_pct),'<small>%</small>');
+  setStat('sSwap',d.mem.swap.usage_pct,cls(d.mem.swap.usage_pct),'<small>%</small>');
+  const root=d.disk.find(x=>x.mount==='/')||d.disk[0]||{};
+  setStat('sDisk',root.use_pct??null,cls(root.use_pct??0),'<small>%</small>');
+  $('sNetD').querySelector('.v').textContent=fmtRate(d.net.total.rx_bps);
+  $('sNetU').querySelector('.v').textContent=fmtRate(d.net.total.tx_bps);
+
+  // modules
+  $('mCores').textContent=d.cores;
+  $('mLoad1').textContent=d.loadavg[0];$('mLoad5').textContent=d.loadavg[1];$('mLoad15').textContent=d.loadavg[2];
+  $('mUp').textContent=fmtDur(d.uptime_s);
+
+  setBar($('memBar'),d.mem.usage_pct);
+  $('mMemUsed').textContent=fmtB(d.mem.used)+' / '+fmtB(d.mem.total);
+  $('mMemAvail').textContent=fmtB(d.mem.available);
+  $('mMemCache').textContent=fmtB(d.mem.buff_cache);
+  $('mMemTotal').textContent=fmtB(d.mem.total);
+
+  setBar($('swapBar'),d.mem.swap.usage_pct);
+  $('mSwapUsed').textContent=fmtB(d.mem.swap.used)+' / '+fmtB(d.mem.swap.total);
+  $('mSwapFree').textContent=fmtB(d.mem.swap.free);
+  $('mSwapTotal').textContent=fmtB(d.mem.swap.total);
+
+  $('mNet').innerHTML=d.net.interfaces.map(n=>
+    `<div class="ifrow"><span class="n">${n.name}${n.link_mbps?` <span style="color:var(--faint)">${n.link_mbps}M</span>`:''}</span><span class="r">↓${fmtRate(n.rx_bps)}</span><span class="t">↑${fmtRate(n.tx_bps)}</span></div>`
+  ).join('')||'<div class="mrow"><span>no interfaces</span></div>';
+
+  $('ioBody').innerHTML=d.diskio.map(x=>
+    `<tr><td>${x.dev}</td><td class="green">${fmtRate(x.r_kbps*1024)}</td><td class="orange">${fmtRate(x.w_kbps*1024)}</td><td>${x.r_total_gb}G</td><td>${x.w_total_gb}G</td></tr>`
+  ).join('')||'<tr><td colspan="5" style="color:var(--faint)">no block devices</td></tr>';
+
+  $('procBody').innerHTML=d.procs.map(p=>
+    `<tr><td>${p.pid}</td><td>${p.name}</td><td class="gold">${p.cpu}%</td><td>${p.mem}%</td><td class="cmd">${p.cmd}</td></tr>`
   ).join('');
 
-  const chips = SERVICES.map(s => s.url
-    ? `<span class="chip" title="${s.desc}"><a href="${s.url}" target="_blank" rel="noopener">${s.name}</a></span>`
-    : `<span class="chip" title="${s.desc}">${s.name}</span>`);
-  if (Array.isArray(d.docker) && d.docker.length) {
-    chips.push(`<span class="chip" title="docker daemon">${d.docker.length} containers up</span>`);
-    $('svcChips').innerHTML = chips.join('');
-  }
+  const chips=(Array.isArray(d.docker)&&d.docker.length)
+    ? `<span class="chip"><span class="up">●</span> ${d.docker.length} containers up</span>`:'';
+  $('svcBox').innerHTML=SERVICES.map(s=>
+    `<span class="chip">${s.url?`<a href="${s.url}" target="_blank" rel="noopener">${s.name}</a>`:s.name}</span>`).join('')+chips;
+
+  // ticker
+  const t=new Date().toLocaleTimeString();
+  const status=d.cpu_usage_pct>=85?'<span class="w">HIGH LOAD</span>':d.mem.swap.usage_pct>=80?'<span class="w">SWAP PRESSURE</span>':'<span class="ok">OK</span>';
+  log.unshift(`<span class="t">[${t}]</span> poll #${H.cpu.length} · cpu ${d.cpu_usage_pct}% · mem ${d.mem.usage_pct}% · swap ${d.mem.swap.usage_pct}% · net ↓${fmtRate(d.net.total.rx_bps)} ↑${fmtRate(d.net.total.tx_bps)} · ${status}`);
+  if(log.length>6)log.pop();
+  $('logLines').innerHTML=log.map(l=>`<div class="line">${l}</div>`).join('');
 }
 
-async function tick() {
-  try {
-    const r = await fetch('/api/stats', { cache: 'no-store' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+const SERVICES=[
+  {name:'madhur.dev',url:'https://madhur.dev'},{name:'aa.madhur.dev',url:'https://aa.madhur.dev'},
+  {name:'ai.madhur.dev',url:'https://ai.madhur.dev'},{name:'meetings.madhur.dev',url:'https://meetings.madhur.dev'},
+  {name:'nav.madhur.dev',url:'https://nav.madhur.dev'},{name:'n8n.madhur.dev',url:'https://n8n.madhur.dev'},
+  {name:'ollama.madhur.dev',url:'https://ollama.madhur.dev'},{name:'docker.madhur.dev',url:'https://docker.madhur.dev'},
+  {name:'code.madhur.dev',url:'https://code.madhur.dev'},{name:'rdp.madhur.dev',url:'https://rdp.madhur.dev'},
+  {name:'Supabase'},{name:'OmniRoute'},{name:'Hermes'},
+];
+$('svcBox').innerHTML=SERVICES.map(s=>`<span class="chip">${s.url?`<a href="${s.url}" target="_blank" rel="noopener">${s.name}</a>`:s.name}</span>`).join('');
+
+async function tick(){
+  try{
+    const r=await fetch('/api/stats',{cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
     render(await r.json());
-  } catch (e) {
-    $('footRight').textContent = 'error: ' + e.message;
-  }
+  }catch(e){$('fRight').textContent='ERR '+e.message}
 }
 
-function start() {
-  btn.classList.remove('stop'); btn.classList.add('live');
-  btn.setAttribute('aria-pressed', 'true');
-  label.textContent = 'Stop Monitoring';
-  pill.classList.add('live'); pillTxt.textContent = 'Live';
-  $('idleState').classList.add('hidden');
-  $('dash').classList.remove('dim');
-  tick();
-  timer = setInterval(tick, 2000);
+function start(){
+  btn.classList.remove('stop');btn.classList.add('live');
+  btn.setAttribute('aria-pressed','true');label.textContent='STOP MONITOR';
+  led.classList.add('live');ledTxt.textContent='LIVE';
+  $('standby').classList.add('hidden');
+  const d=$('dash');d.classList.remove('dim');
+  d.querySelectorAll('.fadein').forEach((el,i)=>el.style.animationDelay=(i*70)+'ms');
+  log.unshift(`<span class="t">[${new Date().toLocaleTimeString()}]</span> <span class="ok">telemetry stream started</span>`);
+  tick();timer=setInterval(tick,2000);
 }
-function stop() {
-  clearInterval(timer); timer = null;
-  btn.classList.remove('live', 'stop'); btn.classList.add('idle');
-  btn.setAttribute('aria-pressed', 'false');
-  label.textContent = 'Start Monitoring';
-  pill.classList.remove('live'); pillTxt.textContent = 'Idle';
-  $('idleState').classList.remove('hidden');
+function stop(){
+  clearInterval(timer);timer=null;
+  btn.classList.remove('live','stop');btn.setAttribute('aria-pressed','false');
+  label.textContent='START MONITOR';
+  led.classList.remove('live');ledTxt.textContent='IDLE';
+  $('standby').classList.remove('hidden');
   $('dash').classList.add('dim');
-  $('footRight').textContent = 'monitoring stopped · idle';
+  $('fRight').textContent='stream stopped · idle';
+  log.unshift(`<span class="t">[${new Date().toLocaleTimeString()}]</span> <span class="w">telemetry stream halted — standby</span>`);
+  if(log.length>6)log.pop();
+  $('logLines').innerHTML=log.map(l=>`<div class="line">${l}</div>`).join('');
 }
-btn.addEventListener('click', () => (timer ? stop() : start()));
+btn.addEventListener('click',()=>timer?stop():start());
 
-fetch('/api/health').then(r => r.json()).then(h => {
-  if (!hasData) $('footRight').textContent = 'idle · server online since ' + new Date(h.ts).toLocaleTimeString();
-}).catch(() => {});
+fetch('/api/health').then(r=>r.json()).then(h=>{
+  $('fRight').textContent='idle · uplink online since '+new Date(h.ts).toLocaleTimeString();
+}).catch(()=>{});
 </script>
 </body>
 </html>

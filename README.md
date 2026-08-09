@@ -21,11 +21,16 @@ Live at: **https://health.madhur.dev**
 - No dependencies — plain Node.js `http` + `/proc` reads.
 
 ## Design
-- Charcoal graphite palette with a warm **gold** accent (no blue) — professional, low-glare dark theme.
-- Ring gauges for CPU / memory / swap / storage; gold sparklines for network throughput.
-- Micro-interactions: spring-like ease, hover lifts, press-down response, pulsing live indicator.
+Version 2 is a full visual rebuild, not a recolor:
+
+- Mission-control / telemetry-terminal layout with a command bar, status LED, standby prompt, live event log, and module grid.
+- Large real-time multi-series telemetry chart for CPU, memory, download, and upload.
+- Big live stat strip for CPU, memory, swap, disk, and network throughput.
+- Terminal-style modules for processor, memory, swap, network interfaces, disk I/O, top processes, and deployed services.
+- Professional dark palette: near-black graphite, warm gold, amber, emerald, violet — no blue hero theme.
+- Micro-interactions: monitor press response, live LED pulse, hover lift, chart glow, staggered panel entrance.
 - `prefers-reduced-motion` respected. Zero dependencies kept — plain HTML/CSS/JS.
-- Redesigned with [emilkowalski/skills](https://github.com/pmadhurn/skills-for-ai) (design skills: emil-design-eng, apple-design, animate).
+- Redesigned with [emilkowalski/skills](https://github.com/pmadhurn/skills-for-ai) (emil-design-eng, apple-design, animate, pick-ui-library).
 
 ## Run
 ```bash
