@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PulseBoard — Server Health</title>
+<style>
+  :root {
+    --bg: #0b0f1a; --panel: #121828; --panel2: #0e1424;
+    --line: #1f2a44; --txt: #dbe4ff; --muted: #7d8db1;
+    --acc: #38bdf8; --good: #34d399; --warn: #fbbf24; --bad: #f87171;
+    --mono: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--txt);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 42px; height: 42px; border-radius: 12px; flex: none;
+    background: linear-gradient(135deg, #38bdf8, #6366f1);
+    display: grid; place-items: center; font-size: 22px; font-weight: 800; color: #0b0f1a;
+  }
+  h1 { font-size: 24px; letter-spacing: .5px; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    border: 0; cursor: pointer; font-weight: 700; font-size: 15px;
+    padding: 12px 26px; border-radius: 12px; color: #0b0f1a;
+    background: linear-gradient(135deg, #34d399, #38bdf8);
+    transition: transform .1s, box-shadow .2s, opacity .2s;
+    box-shadow: 0 6px 24px rgba(56, 189, 248, .25);
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.stop { background: linear-gradient(135deg, #f87171, #fb7185); box-shadow: 0 6px 24px rgba(248, 113, 113, .25); }
+  .btn .dot {
+    width: 10px; height: 10px; border-radius: 50%; background: currentColor;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: .35; transform: scale(.8);} }
+  .btn.idle .dot { animation: none; opacity: .5; }
+
+  .idle-banner {
+    border: 1px dashed var(--line); background: var(--panel2); color: var(--muted);
+    border-radius: 14px; padding: 34px 20px; text-align: center; margin-bottom: 20px;
+    font-size: 14px;
+  }
+  .idle-banner strong { color: var(--txt); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px 18px;
+  }
+  .card h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: baseline; }
+  .card h3 .big { font-size: 22px; color: var(--txt); letter-spacing: 0; }
+  .bar { height: 10px; border-radius: 6px; background: #1a2340; overflow: hidden; margin: 8px 0 4px; }
+  .bar > i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--acc), #6366f1); transition: width .5s ease; }
+  .bar.warn > i { background: linear-gradient(90deg, var(--warn), #f97316); }
+  .bar.bad > i { background: linear-gradient(90deg, var(--bad), #ef4444); }
+  .kv { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 3px; }
+  .kv b { color: var(--txt); font-weight: 600; }
+
+  .span2 { grid-column: span 2; }
+  .net-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .net-if { flex: 1 1 260px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .net-if .ifname { font-family: var(--mono); font-size: 13px; color: var(--acc); }
+  .net-if .rate { font-family: var(--mono); font-size: 20px; margin: 4px 0 2px; }
+  .net-if .rate small { font-size: 12px; color: var(--muted); }
+  .net-if .meta { font-size: 11px; color: var(--muted); }
+  canvas { width: 100%; height: 64px; display: block; margin-top: 8px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .8px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 6px 8px; border-bottom: 1px solid #16203a; font-family: var(--mono); font-size: 12px; }
+  td .cmd { color: var(--muted); }
+  .chip { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #132036; color: var(--acc); border: 1px solid #1f3a5f; margin: 3px 4px 3px 0; }
+  .chip.up { color: var(--good); border-color: #14532d; background: #0c2418; }
+  .chip a { color: inherit; text-decoration: none; }
+  .chip a:hover { text-decoration: underline; }
+  .svc { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  footer { margin-top: 26px; color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .dim { opacity: .45; transition: opacity .4s; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo">♡</div>
+      <div>
+        <h1>PulseBoard</h1>
+        <div class="sub" id="hostSub">server health · on demand</div>
+      </div>
+    </div>
+    <button class="btn idle" id="monBtn"><span class="dot"></span><span id="monLabel">Start Monitoring</span></button>
+  </header>
+
+  <div class="idle-banner" id="idleBanner">
+    <strong>Idle mode.</strong> No data is being collected — monitoring only starts when you press the button above.
+    This keeps the server's CPU free until you actually want to look. 
+  </div>
+
+  <div class="grid dim" id="dash">
+    <div class="card">
+      <h3>CPU <span class="big" id="cpuPct">—</span></h3>
+      <div class="bar" id="cpuBar"><i style="width:0%"></i></div>
+      <div class="kv"><span>cores</span><b id="cpuCores">—</b></div>
+      <div class="kv"><span>load (1/5/15m)</span><b id="load">—</b></div>
+    </div>
+    <div class="card">
+      <h3>Memory <span class="big" id="memPct">—</span></h3>
+      <div class="bar" id="memBar"><i style="width:0%"></i></div>
+      <div class="kv"><span>used</span><b id="memUsed">—</b></div>
+      <div class="kv"><span>available</span><b id="memAvail">—</b></div>
+    </div>
+    <div class="card">
+      <h3>Swap <span class="big" id="swapPct">—</span></h3>
+      <div class="bar" id="swapBar"><i style="width:0%"></i></div>
+      <div class="kv"><span>used</span><b id="swapUsed">—</b></div>
+      <div class="kv"><span>free</span><b id="swapFree">—</b></div>
+    </div>
+    <div class="card">
+      <h3>Storage <span class="big" id="diskPct">—</span></h3>
+      <div class="bar" id="diskBar"><i style="width:0%"></i></div>
+      <div class="kv"><span>used</span><b id="diskUsed">—</b></div>
+      <div class="kv"><span>available</span><b id="diskAvail">—</b></div>
+      <div id="diskExtra" class="svc"></div>
+    </div>
+
+    <div class="card span2">
+      <h3>Network <span class="big" id="netTotal">—</span></h3>
+      <div class="net-row" id="netRow"></div>
+    </div>
+
+    <div class="card span2">
+      <h3>Disk I/O (live)</h3>
+      <div id="ioRow"></div>
+    </div>
+
+    <div class="card span2">
+      <h3>Top Processes</h3>
+      <table>
+        <thead><tr><th>PID</th><th>Name</th><th>CPU%</th><th>MEM%</th><th>Command</th></tr></thead>
+        <tbody id="procBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card span2">
+      <h3>Deployed Services</h3>
+      <div id="svcChips"></div>
+      <div class="svc" id="svcNote"></div>
+    </div>
+  </div>
+
+  <footer>
+    <span id="footLeft">PulseBoard · zero-idle monitoring</span>
+    <span id="footRight"></span>
+  </footer>
+</div>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const btn = $('monBtn'), label = $('monLabel');
+let timer = null;
+const history = { rx: [], tx: [] };
+const MAX = 60;
+
+const fmt = (n) => n.toLocaleString('en-US');
+const fmtB = (b) => {
+  if (b >= 1024 ** 3) return (b / 1024 ** 3).toFixed(2) + ' GiB';
+  if (b >= 1024 ** 2) return (b / 1024 ** 2).toFixed(1) + ' MiB';
+  if (b >= 1024) return (b / 1024).toFixed(0) + ' KiB';
+  return b + ' B';
+};
+const fmtRate = (bps) => {
+  if (bps >= 1024 ** 3) return (bps / 1024 ** 3).toFixed(2) + ' GB/s';
+  if (bps >= 1024 ** 2) return (bps / 1024 ** 2).toFixed(1) + ' MB/s';
+  if (bps >= 1024) return (bps / 1024).toFixed(0) + ' KB/s';
+  return bps + ' B/s';
+};
+const fmtDur = (s) => {
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  if (d) return `${d}d ${h}h ${m}m`;
+  if (h) return `${h}h ${m}m`;
+  return `${m}m`;
+};
+
+function setBar(el, pct) {
+  el.className = 'bar' + (pct >= 85 ? ' bad' : pct >= 65 ? ' warn' : '');
+  el.firstElementChild.style.width = pct + '%';
+}
+
+function drawSpark(canvas, arr, color) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.clientWidth * devicePixelRatio;
+  const h = canvas.height = canvas.clientHeight * devicePixelRatio;
+  ctx.clearRect(0, 0, w, h);
+  if (!arr.length) return;
+  const max = Math.max(...arr, 1);
+  ctx.strokeStyle = color; ctx.lineWidth = 2 * devicePixelRatio; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  arr.forEach((v, i) => {
+    const x = (i / (MAX - 1)) * w;
+    const y = h - (v / max) * (h - 4) - 2;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+const SERVICES = [
+  { name: 'madhur.dev', url: 'https://madhur.dev', desc: 'Portfolio (devfolio)' },
+  { name: 'aa.madhur.dev', url: 'https://aa.madhur.dev', desc: 'Aravalli Ayurveda' },
+  { name: 'ai.madhur.dev', url: 'https://ai.madhur.dev', desc: 'Open WebUI' },
+  { name: 'meetings.madhur.dev', url: 'https://meetings.madhur.dev', desc: 'SpeakInsights' },
+  { name: 'nav.madhur.dev', url: 'https://nav.madhur.dev', desc: 'NavDashboard' },
+  { name: 'n8n.madhur.dev', url: 'https://n8n.madhur.dev', desc: 'n8n workflows' },
+  { name: 'ollama.madhur.dev', url: 'https://ollama.madhur.dev', desc: 'Ollama API' },
+  { name: 'docker.madhur.dev', url: 'https://docker.madhur.dev', desc: 'Portainer' },
+  { name: 'code.madhur.dev', url: 'https://code.madhur.dev', desc: 'Code server' },
+  { name: 'rdp.madhur.dev', url: 'https://rdp.madhur.dev', desc: 'Remote Desktop' },
+  { name: 'Supabase', desc: 'local stack · db, auth, storage, studio' },
+  { name: 'OmniRoute', desc: 'AI gateway · localhost:20128' },
+  { name: 'Hermes', desc: 'AI agent gateway' },
+];
+$('svcChips').innerHTML = SERVICES.map(s =>
+  `<span class="chip up">${s.url ? `<a href="${s.url}" target="_blank" rel="noopener">${s.name}</a>` : s.name}</span>`
+).join('');
+$('svcNote').textContent = 'Services discovered from server + obsidian deployment notes (2026-08-10).';
+
+function render(d) {
+  $('hostSub').textContent = `${d.hostname} · ${d.os} · up ${fmtDur(d.uptime_s)}`;
+  $('footLeft').textContent = `PulseBoard · ${d.hostname} · up ${fmtDur(d.uptime_s)}`;
+  $('footRight').textContent = `updated ${new Date(d.ts).toLocaleTimeString()}`;
+
+  $('cpuPct').textContent = d.cpu_usage_pct + '%';
+  setBar($('cpuBar'), d.cpu_usage_pct);
+  $('cpuCores').textContent = d.cores;
+  $('load').textContent = d.loadavg.join(' / ');
+
+  $('memPct').textContent = d.mem.usage_pct + '%';
+  setBar($('memBar'), d.mem.usage_pct);
+  $('memUsed').textContent = fmtB(d.mem.used) + ' / ' + fmtB(d.mem.total);
+  $('memAvail').textContent = fmtB(d.mem.available) + ' free';
+
+  $('swapPct').textContent = d.mem.swap.usage_pct + '%';
+  setBar($('swapBar'), d.mem.swap.usage_pct);
+  $('swapUsed').textContent = fmtB(d.mem.swap.used) + ' / ' + fmtB(d.mem.swap.total);
+  $('swapFree').textContent = fmtB(d.mem.swap.free) + ' free';
+
+  const root = d.disk.find(x => x.mount === '/') || d.disk[0] || {};
+  $('diskPct').textContent = (root.use_pct ?? 0) + '%';
+  setBar($('diskBar'), root.use_pct ?? 0);
+  $('diskUsed').textContent = fmtB(root.used ?? 0) + ' / ' + fmtB(root.size ?? 0);
+  $('diskAvail').textContent = fmtB(root.avail ?? 0) + ' available';
+  $('diskExtra').textContent = d.disk.map(x => `${x.mount}: ${x.use_pct}%`).join(' · ');
+
+  // network
+  const total = d.net.total;
+  $('netTotal').textContent = `↓ ${fmtRate(total.rx_bps)}  ↑ ${fmtRate(total.tx_bps)}`;
+  history.rx.push(total.rx_bps); history.tx.push(total.tx_bps);
+  if (history.rx.length > MAX) { history.rx.shift(); history.tx.shift(); }
+  $('netRow').innerHTML = d.net.interfaces.map(n => `
+    <div class="net-if">
+      <div class="ifname">${n.name}${n.link_mbps ? ` · ${n.link_mbps} Mb/s link` : ''}</div>
+      <div class="rate">↓ ${fmtRate(n.rx_bps)} <small>↑ ${fmtRate(n.tx_bps)}</small></div>
+      <div class="meta">total ↓ ${fmtB(n.rx_total_gb * 1024 ** 3)} · ↑ ${fmtB(n.tx_total_gb * 1024 ** 3)}</div>
+      <canvas data-c="rx"></canvas>
+    </div>`).join('') || '<div class="svc">no non-loopback interfaces</div>';
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.net-if canvas').forEach((cv, i) => {
+      drawSpark(cv, history.rx, '#38bdf8');
+    });
+  });
+
+  // disk io
+  $('ioRow').innerHTML = '<table><thead><tr><th>Device</th><th>Read</th><th>Write</th><th>Total R</th><th>Total W</th></tr></thead><tbody>' +
+    d.diskio.map(x => `<tr><td>${x.dev}</td><td style="color:var(--good)">${fmtRate(x.r_kbps * 1024)}</td><td style="color:var(--warn)">${fmtRate(x.w_kbps * 1024)}</td><td>${x.r_total_gb} GB</td><td>${x.w_total_gb} GB</td></tr>`).join('') +
+    '</tbody></table>';
+
+  // processes
+  $('procBody').innerHTML = d.procs.map(p =>
+    `<tr><td>${p.pid}</td><td>${p.name}</td><td>${p.cpu}%</td><td>${p.mem}%</td><td class="cmd">${p.cmd}</td></tr>`
+  ).join('');
+
+  // docker services (live)
+  const chips = SERVICES.map(s => s.url ? `<span class="chip up"><a href="${s.url}" target="_blank" rel="noopener">${s.name}</a></span>` : `<span class="chip up">${s.name}</span>`);
+  if (Array.isArray(d.docker) && d.docker.length) {
+    const running = d.docker.map(c => `<span class="chip up" title="${c.image}">${c.name}${c.status.startsWith('Up') ? '' : ' ⚠'}</span>`).join('');
+    chips.push('<div class="svc">docker containers running: ' + d.docker.length + '</div>');
+    $('svcChips').innerHTML = chips.join('');
+  }
+}
+
+async function tick() {
+  try {
+    const r = await fetch('/api/stats', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    render(await r.json());
+  } catch (e) {
+    $('footRight').textContent = 'error: ' + e.message;
+  }
+}
+
+function start() {
+  btn.classList.remove('idle', 'stop');
+  label.textContent = 'Stop Monitoring';
+  $('idleBanner').classList.add('hidden');
+  $('dash').classList.remove('dim');
+  tick();
+  timer = setInterval(tick, 2000);
+}
+function stop() {
+  clearInterval(timer); timer = null;
+  btn.classList.add('idle');
+  label.textContent = 'Start Monitoring';
+  $('idleBanner').classList.remove('hidden');
+  $('dash').classList.add('dim');
+  $('footRight').textContent = 'monitoring stopped · idle';
+}
+btn.addEventListener('click', () => (timer ? stop() : start()));
+
+// warm the host line without collecting stats (uptime etc. are cheap)
+fetch('/api/health').then(r => r.json()).then(h => {
+  $('footRight').textContent = 'idle · server online since ' + new Date(h.ts).toLocaleTimeString();
+}).catch(() => {});
+</script>
+</body>
+</html>
