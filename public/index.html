@@ -3,162 +3,292 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0b">
 <title>PulseBoard — Server Health</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141417'/%3E%3Cpath d='M5 17h5l2.5-7 5 12 3-8 1.5 3H27' fill='none' stroke='%23e8b257' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
   :root {
-    --bg: #0b0f1a; --panel: #121828; --panel2: #0e1424;
-    --line: #1f2a44; --txt: #dbe4ff; --muted: #7d8db1;
-    --acc: #38bdf8; --good: #34d399; --warn: #fbbf24; --bad: #f87171;
-    --mono: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+    --bg: #0a0a0b;
+    --panel: #121214;
+    --panel-2: #17171a;
+    --panel-3: #1c1c20;
+    --line: rgba(255, 255, 255, 0.07);
+    --line-strong: rgba(255, 255, 255, 0.12);
+    --txt: #f2f2f3;
+    --muted: #9a9aa3;
+    --faint: #6b6b74;
+    --acc: #e8b257;            /* gold accent */
+    --acc-soft: #f2c97d;
+    --good: #3dd68c;
+    --warn: #f59e0b;
+    --bad: #f4615f;
+    --r: 12px;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
   body {
     background: var(--bg); color: var(--txt);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--sans);
     min-height: 100vh;
+    position: relative;
   }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+  /* restrained top glow — depth without decoration */
+  body::before {
+    content: ""; position: fixed; inset: 0 0 auto 0; height: 420px; pointer-events: none;
+    background: radial-gradient(60% 100% at 50% 0%, rgba(232, 178, 87, 0.05), transparent 70%);
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 26px 22px 64px; position: relative; }
 
-  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
-  .brand { display: flex; align-items: center; gap: 12px; }
+  /* ── header ─────────────────────────────────────── */
+  header { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 26px; }
+  .brand { display: flex; align-items: center; gap: 13px; }
   .logo {
-    width: 42px; height: 42px; border-radius: 12px; flex: none;
-    background: linear-gradient(135deg, #38bdf8, #6366f1);
-    display: grid; place-items: center; font-size: 22px; font-weight: 800; color: #0b0f1a;
+    width: 40px; height: 40px; border-radius: 11px; flex: none;
+    background: linear-gradient(150deg, #1d1d21, #101013);
+    border: 1px solid var(--line-strong);
+    display: grid; place-items: center;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 6px 18px rgba(0,0,0,.45);
   }
-  h1 { font-size: 24px; letter-spacing: .5px; }
-  .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .logo svg { width: 22px; height: 22px; }
+  .wordmark { font-size: 17px; font-weight: 650; letter-spacing: 0.14em; text-transform: uppercase; }
+  .wordmark span { color: var(--acc); }
+  .sub { color: var(--muted); font-size: 12.5px; margin-top: 2px; letter-spacing: .02em; }
+
+  .actions { display: flex; align-items: center; gap: 14px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--faint); background: var(--panel); border: 1px solid var(--line);
+    padding: 6px 12px; border-radius: 999px;
+    transition: color .3s var(--ease), border-color .3s var(--ease);
+  }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .pill.live { color: var(--acc); border-color: rgba(232,178,87,.35); }
+  .pill.live .dot { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: .35; transform: scale(.72);} }
 
   .btn {
-    display: inline-flex; align-items: center; gap: 10px;
-    border: 0; cursor: pointer; font-weight: 700; font-size: 15px;
-    padding: 12px 26px; border-radius: 12px; color: #0b0f1a;
-    background: linear-gradient(135deg, #34d399, #38bdf8);
-    transition: transform .1s, box-shadow .2s, opacity .2s;
-    box-shadow: 0 6px 24px rgba(56, 189, 248, .25);
+    display: inline-flex; align-items: center; gap: 9px;
+    border: 0; cursor: pointer; font-weight: 650; font-size: 13.5px; font-family: var(--sans);
+    padding: 10px 20px; border-radius: 999px; letter-spacing: .02em;
+    color: #14100a;
+    background: linear-gradient(160deg, var(--acc-soft), var(--acc));
+    box-shadow: 0 2px 6px rgba(232,178,87,.18), inset 0 1px 0 rgba(255,255,255,.35);
+    transition: transform .12s var(--ease), box-shadow .25s var(--ease), filter .25s;
   }
-  .btn:hover { transform: translateY(-1px); }
-  .btn.stop { background: linear-gradient(135deg, #f87171, #fb7185); box-shadow: 0 6px 24px rgba(248, 113, 113, .25); }
-  .btn .dot {
-    width: 10px; height: 10px; border-radius: 50%; background: currentColor;
-    animation: pulse 1.4s ease-in-out infinite;
-  }
-  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: .35; transform: scale(.8);} }
-  .btn.idle .dot { animation: none; opacity: .5; }
+  .btn:hover { filter: brightness(1.05); box-shadow: 0 4px 14px rgba(232,178,87,.28), inset 0 1px 0 rgba(255,255,255,.35); }
+  .btn:active { transform: scale(.965); }          /* respond on pointer-down */
+  .btn.stop { color: #1a0d0c; background: linear-gradient(160deg, #f57b78, #f4615f); box-shadow: 0 2px 6px rgba(244,97,95,.18), inset 0 1px 0 rgba(255,255,255,.3); }
+  .btn .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .btn.live .dot { animation: pulse 1.4s ease-in-out infinite; }
 
-  .idle-banner {
-    border: 1px dashed var(--line); background: var(--panel2); color: var(--muted);
-    border-radius: 14px; padding: 34px 20px; text-align: center; margin-bottom: 20px;
-    font-size: 14px;
+  /* ── idle empty state ───────────────────────────── */
+  .idle-state {
+    border: 1px solid var(--line); background: var(--panel);
+    border-radius: var(--r); padding: 48px 24px; text-align: center;
+    margin-bottom: 20px;
   }
-  .idle-banner strong { color: var(--txt); }
+  .idle-state .glyph {
+    width: 54px; height: 54px; margin: 0 auto 16px; border-radius: 16px;
+    display: grid; place-items: center; color: var(--faint);
+    background: var(--panel-2); border: 1px solid var(--line);
+  }
+  .idle-state h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .idle-state p { color: var(--muted); font-size: 13.5px; max-width: 430px; margin: 0 auto; line-height: 1.55; }
+  .idle-state p b { color: var(--acc); font-weight: 600; }
 
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  /* ── grid & cards ───────────────────────────────── */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
   .card {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
-    padding: 16px 18px;
+    background: linear-gradient(180deg, var(--panel), rgba(18,18,20,.6));
+    border: 1px solid var(--line); border-radius: var(--r);
+    padding: 16px 18px; position: relative;
+    transition: border-color .25s var(--ease), transform .25s var(--ease), box-shadow .25s var(--ease);
   }
-  .card h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: baseline; }
-  .card h3 .big { font-size: 22px; color: var(--txt); letter-spacing: 0; }
-  .bar { height: 10px; border-radius: 6px; background: #1a2340; overflow: hidden; margin: 8px 0 4px; }
-  .bar > i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--acc), #6366f1); transition: width .5s ease; }
-  .bar.warn > i { background: linear-gradient(90deg, var(--warn), #f97316); }
-  .bar.bad > i { background: linear-gradient(90deg, var(--bad), #ef4444); }
-  .kv { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 3px; }
-  .kv b { color: var(--txt); font-weight: 600; }
-
+  .card:hover { border-color: var(--line-strong); transform: translateY(-1px); box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+  .card h3 {
+    font-size: 10.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .14em;
+    color: var(--faint); margin-bottom: 12px;
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
   .span2 { grid-column: span 2; }
-  .net-row { display: flex; gap: 14px; flex-wrap: wrap; }
-  .net-if { flex: 1 1 260px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-  .net-if .ifname { font-family: var(--mono); font-size: 13px; color: var(--acc); }
-  .net-if .rate { font-family: var(--mono); font-size: 20px; margin: 4px 0 2px; }
-  .net-if .rate small { font-size: 12px; color: var(--muted); }
-  .net-if .meta { font-size: 11px; color: var(--muted); }
-  canvas { width: 100%; height: 64px; display: block; margin-top: 8px; }
+  .kv { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--faint); margin-top: 4px; }
+  .kv b { color: var(--txt); font-weight: 550; font-variant-numeric: tabular-nums; }
 
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .8px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
-  td { padding: 6px 8px; border-bottom: 1px solid #16203a; font-family: var(--mono); font-size: 12px; }
-  td .cmd { color: var(--muted); }
-  .chip { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #132036; color: var(--acc); border: 1px solid #1f3a5f; margin: 3px 4px 3px 0; }
-  .chip.up { color: var(--good); border-color: #14532d; background: #0c2418; }
+  /* ring gauges */
+  .gauge { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .gauge svg { width: 108px; height: 108px; }
+  .gauge .track { fill: none; stroke: rgba(255,255,255,.06); stroke-width: 7; }
+  .gauge .prog {
+    fill: none; stroke: var(--acc); stroke-width: 7; stroke-linecap: round;
+    stroke-dasharray: 326.7; stroke-dashoffset: 326.7;
+    transform: rotate(-90deg); transform-origin: 50% 50%;
+    transition: stroke-dashoffset .7s var(--ease), stroke .4s;
+  }
+  .gauge .prog.warn { stroke: var(--warn); }
+  .gauge .prog.bad  { stroke: var(--bad); }
+  .gauge .prog.good { stroke: var(--good); }
+  .gauge-val { font-family: var(--mono); font-size: 24px; font-weight: 600; margin-top: -72px; font-variant-numeric: tabular-nums; }
+  .gauge-val small { font-size: 12px; color: var(--faint); font-weight: 500; margin-left: 1px; }
+  .gauge .g-name { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); font-weight: 650; }
+  .gauge-sub { font-size: 11px; color: var(--faint); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .gauge-rows { width: 100%; margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+
+  /* network */
+  .net-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .net-if { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .net-if .ifname { font-family: var(--mono); font-size: 12px; color: var(--acc); letter-spacing: .04em; }
+  .net-if .ifname .tag { color: var(--faint); font-size: 10px; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; margin-left: 6px; letter-spacing: .08em; }
+  .net-if .rate { font-family: var(--mono); font-size: 19px; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+  .net-if .rate .up { color: var(--muted); font-size: 13px; }
+  .net-if .meta { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
+  canvas { width: 100%; height: 56px; display: block; margin-top: 10px; }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; color: var(--faint); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .12em; padding: 5px 10px; border-bottom: 1px solid var(--line); }
+  td { padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,.04); font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+  tbody tr { transition: background .15s; }
+  tbody tr:hover { background: rgba(255,255,255,.025); }
+  td .cmd { color: var(--faint); font-family: var(--sans); font-size: 11.5px; }
+
+  /* services */
+  .chip {
+    display: inline-block; padding: 4px 12px; border-radius: 7px; font-size: 12px; font-weight: 550;
+    background: var(--panel-2); color: var(--txt); border: 1px solid var(--line);
+    margin: 0 6px 8px 0; transition: border-color .2s, color .2s;
+  }
+  .chip:hover { border-color: rgba(232,178,87,.4); }
   .chip a { color: inherit; text-decoration: none; }
-  .chip a:hover { text-decoration: underline; }
-  .svc { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
-  footer { margin-top: 26px; color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-  .dim { opacity: .45; transition: opacity .4s; }
+  .chip a:hover { color: var(--acc); }
+  .svc-note { font-size: 12px; color: var(--faint); margin-top: 6px; line-height: 1.6; }
+
+  footer { margin-top: 30px; color: var(--faint); font-size: 11.5px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; letter-spacing: .02em; }
+  footer b { color: var(--muted); font-weight: 550; }
+
+  .dim { opacity: .4; transition: opacity .5s var(--ease); }
   .hidden { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div class="brand">
-      <div class="logo">♡</div>
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none"><path d="M4 17h5l2.5-7 5 12 3-8 1.5 3H28" stroke="#e8b257" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
       <div>
-        <h1>PulseBoard</h1>
+        <div class="wordmark">Pulse<span>Board</span></div>
         <div class="sub" id="hostSub">server health · on demand</div>
       </div>
     </div>
-    <button class="btn idle" id="monBtn"><span class="dot"></span><span id="monLabel">Start Monitoring</span></button>
+    <div class="actions">
+      <span class="pill" id="statusPill"><span class="dot"></span><span id="statusTxt">Idle</span></span>
+      <button class="btn" id="monBtn" aria-pressed="false"><span class="dot"></span><span id="monLabel">Start Monitoring</span></button>
+    </div>
   </header>
 
-  <div class="idle-banner" id="idleBanner">
-    <strong>Idle mode.</strong> No data is being collected — monitoring only starts when you press the button above.
-    This keeps the server's CPU free until you actually want to look. 
+  <div class="idle-state" id="idleState">
+    <div class="glyph" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 12h4l2-5 4 10 2.5-6.5L17 12h4"/></svg>
+    </div>
+    <h2>Dashboard is idle</h2>
+    <p>Nothing is being sampled right now. Press <b>Start Monitoring</b> to collect live stats — polling stops the moment you stop, so the server stays quiet.</p>
   </div>
 
-  <div class="grid dim" id="dash">
-    <div class="card">
-      <h3>CPU <span class="big" id="cpuPct">—</span></h3>
-      <div class="bar" id="cpuBar"><i style="width:0%"></i></div>
-      <div class="kv"><span>cores</span><b id="cpuCores">—</b></div>
-      <div class="kv"><span>load (1/5/15m)</span><b id="load">—</b></div>
-    </div>
-    <div class="card">
-      <h3>Memory <span class="big" id="memPct">—</span></h3>
-      <div class="bar" id="memBar"><i style="width:0%"></i></div>
-      <div class="kv"><span>used</span><b id="memUsed">—</b></div>
-      <div class="kv"><span>available</span><b id="memAvail">—</b></div>
-    </div>
-    <div class="card">
-      <h3>Swap <span class="big" id="swapPct">—</span></h3>
-      <div class="bar" id="swapBar"><i style="width:0%"></i></div>
-      <div class="kv"><span>used</span><b id="swapUsed">—</b></div>
-      <div class="kv"><span>free</span><b id="swapFree">—</b></div>
-    </div>
-    <div class="card">
-      <h3>Storage <span class="big" id="diskPct">—</span></h3>
-      <div class="bar" id="diskBar"><i style="width:0%"></i></div>
-      <div class="kv"><span>used</span><b id="diskUsed">—</b></div>
-      <div class="kv"><span>available</span><b id="diskAvail">—</b></div>
-      <div id="diskExtra" class="svc"></div>
-    </div>
+  <main class="grid dim" id="dash">
 
-    <div class="card span2">
-      <h3>Network <span class="big" id="netTotal">—</span></h3>
+    <!-- gauges -->
+    <section class="card">
+      <h3>Processor</h3>
+      <div class="gauge">
+        <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="52"/><circle class="prog" id="cpuRing" cx="60" cy="60" r="52"/></svg>
+        <div class="gauge-val" id="cpuVal">—<small>%</small></div>
+        <div class="g-name">CPU</div>
+        <div class="gauge-rows">
+          <div class="kv"><span>cores</span><b id="cpuCores">—</b></div>
+          <div class="kv"><span>load 1 / 5 / 15m</span><b id="load">—</b></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Working Set</h3>
+      <div class="gauge">
+        <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="52"/><circle class="prog" id="memRing" cx="60" cy="60" r="52"/></svg>
+        <div class="gauge-val" id="memVal">—<small>%</small></div>
+        <div class="g-name">Memory</div>
+        <div class="gauge-rows">
+          <div class="kv"><span>used</span><b id="memUsed">—</b></div>
+          <div class="kv"><span>available</span><b id="memAvail">—</b></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Overflow</h3>
+      <div class="gauge">
+        <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="52"/><circle class="prog" id="swapRing" cx="60" cy="60" r="52"/></svg>
+        <div class="gauge-val" id="swapVal">—<small>%</small></div>
+        <div class="g-name">Swap</div>
+        <div class="gauge-rows">
+          <div class="kv"><span>used</span><b id="swapUsed">—</b></div>
+          <div class="kv"><span>free</span><b id="swapFree">—</b></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Storage</h3>
+      <div class="gauge">
+        <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="52"/><circle class="prog" id="diskRing" cx="60" cy="60" r="52"/></svg>
+        <div class="gauge-val" id="diskVal">—<small>%</small></div>
+        <div class="g-name">Disk</div>
+        <div class="gauge-rows">
+          <div class="kv"><span>used</span><b id="diskUsed">—</b></div>
+          <div class="kv"><span>available</span><b id="diskAvail">—</b></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- network -->
+    <section class="card span2">
+      <h3>Network <span style="font-family:var(--mono);font-size:14px;color:var(--txt);text-transform:none;letter-spacing:0" id="netTotal">↓ — &nbsp;↑ —</span></h3>
       <div class="net-row" id="netRow"></div>
-    </div>
+    </section>
 
-    <div class="card span2">
-      <h3>Disk I/O (live)</h3>
-      <div id="ioRow"></div>
-    </div>
+    <!-- disk io -->
+    <section class="card span2">
+      <h3>Disk I/O <span style="color:var(--faint);font-weight:500" id="ioSub"></span></h3>
+      <table>
+        <thead><tr><th>Device</th><th>Read</th><th>Write</th><th>Total read</th><th>Total written</th></tr></thead>
+        <tbody id="ioBody"></tbody>
+      </table>
+    </section>
 
-    <div class="card span2">
+    <!-- processes -->
+    <section class="card span2">
       <h3>Top Processes</h3>
       <table>
-        <thead><tr><th>PID</th><th>Name</th><th>CPU%</th><th>MEM%</th><th>Command</th></tr></thead>
+        <thead><tr><th>PID</th><th>Process</th><th>CPU</th><th>MEM</th><th>Command</th></tr></thead>
         <tbody id="procBody"></tbody>
       </table>
-    </div>
+    </section>
 
-    <div class="card span2">
+    <!-- services -->
+    <section class="card span2">
       <h3>Deployed Services</h3>
       <div id="svcChips"></div>
-      <div class="svc" id="svcNote"></div>
-    </div>
-  </div>
+      <div class="svc-note" id="svcNote"></div>
+    </section>
+  </main>
 
   <footer>
     <span id="footLeft">PulseBoard · zero-idle monitoring</span>
@@ -169,12 +299,12 @@
 <script>
 'use strict';
 const $ = (id) => document.getElementById(id);
-const btn = $('monBtn'), label = $('monLabel');
-let timer = null;
+const btn = $('monBtn'), label = $('monLabel'), pill = $('statusPill'), pillTxt = $('statusTxt');
+let timer = null, hasData = false;
 const history = { rx: [], tx: [] };
 const MAX = 60;
+const RING_C = 326.7;
 
-const fmt = (n) => n.toLocaleString('en-US');
 const fmtB = (b) => {
   if (b >= 1024 ** 3) return (b / 1024 ** 3).toFixed(2) + ' GiB';
   if (b >= 1024 ** 2) return (b / 1024 ** 2).toFixed(1) + ' MiB';
@@ -194,9 +324,12 @@ const fmtDur = (s) => {
   return `${m}m`;
 };
 
-function setBar(el, pct) {
-  el.className = 'bar' + (pct >= 85 ? ' bad' : pct >= 65 ? ' warn' : '');
-  el.firstElementChild.style.width = pct + '%';
+function setRing(ring, valEl, pct, suffix) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  ring.classList.remove('good', 'warn', 'bad');
+  ring.classList.add(clamped >= 85 ? 'bad' : clamped >= 65 ? 'warn' : 'good');
+  ring.style.strokeDashoffset = RING_C * (1 - clamped / 100);
+  valEl.innerHTML = (pct === null || pct === undefined ? '—' : Math.round(pct)) + (suffix || '');
 }
 
 function drawSpark(canvas, arr, color) {
@@ -206,96 +339,91 @@ function drawSpark(canvas, arr, color) {
   ctx.clearRect(0, 0, w, h);
   if (!arr.length) return;
   const max = Math.max(...arr, 1);
-  ctx.strokeStyle = color; ctx.lineWidth = 2 * devicePixelRatio; ctx.lineJoin = 'round';
+  const step = w / (MAX - 1);
+  // soft gradient fill under the line
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(232,178,87,.20)');
+  grad.addColorStop(1, 'rgba(232,178,87,0)');
   ctx.beginPath();
-  arr.forEach((v, i) => {
-    const x = (i / (MAX - 1)) * w;
-    const y = h - (v / max) * (h - 4) - 2;
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  });
-  ctx.stroke();
+  arr.forEach((v, i) => { const x = i * step; const y = h - (v / max) * (h - 6) - 3; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+  ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+  ctx.beginPath();
+  arr.forEach((v, i) => { const x = i * step; const y = h - (v / max) * (h - 6) - 3; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+  ctx.strokeStyle = color; ctx.lineWidth = 1.8 * devicePixelRatio; ctx.lineJoin = 'round'; ctx.stroke();
 }
 
 const SERVICES = [
-  { name: 'madhur.dev', url: 'https://madhur.dev', desc: 'Portfolio (devfolio)' },
+  { name: 'madhur.dev', url: 'https://madhur.dev', desc: 'Portfolio' },
   { name: 'aa.madhur.dev', url: 'https://aa.madhur.dev', desc: 'Aravalli Ayurveda' },
   { name: 'ai.madhur.dev', url: 'https://ai.madhur.dev', desc: 'Open WebUI' },
   { name: 'meetings.madhur.dev', url: 'https://meetings.madhur.dev', desc: 'SpeakInsights' },
   { name: 'nav.madhur.dev', url: 'https://nav.madhur.dev', desc: 'NavDashboard' },
-  { name: 'n8n.madhur.dev', url: 'https://n8n.madhur.dev', desc: 'n8n workflows' },
+  { name: 'n8n.madhur.dev', url: 'https://n8n.madhur.dev', desc: 'n8n' },
   { name: 'ollama.madhur.dev', url: 'https://ollama.madhur.dev', desc: 'Ollama API' },
   { name: 'docker.madhur.dev', url: 'https://docker.madhur.dev', desc: 'Portainer' },
   { name: 'code.madhur.dev', url: 'https://code.madhur.dev', desc: 'Code server' },
   { name: 'rdp.madhur.dev', url: 'https://rdp.madhur.dev', desc: 'Remote Desktop' },
-  { name: 'Supabase', desc: 'local stack · db, auth, storage, studio' },
-  { name: 'OmniRoute', desc: 'AI gateway · localhost:20128' },
-  { name: 'Hermes', desc: 'AI agent gateway' },
+  { name: 'Supabase', desc: 'local stack' },
+  { name: 'OmniRoute', desc: 'AI gateway :20128' },
+  { name: 'Hermes', desc: 'agent gateway' },
 ];
 $('svcChips').innerHTML = SERVICES.map(s =>
-  `<span class="chip up">${s.url ? `<a href="${s.url}" target="_blank" rel="noopener">${s.name}</a>` : s.name}</span>`
+  `<span class="chip" title="${s.desc}">${s.url ? `<a href="${s.url}" target="_blank" rel="noopener">${s.name}</a>` : s.name}</span>`
 ).join('');
-$('svcNote').textContent = 'Services discovered from server + obsidian deployment notes (2026-08-10).';
+$('svcNote').textContent = 'From server inspection + obsidian deployment notes · 2026-08-10';
 
 function render(d) {
+  hasData = true;
   $('hostSub').textContent = `${d.hostname} · ${d.os} · up ${fmtDur(d.uptime_s)}`;
-  $('footLeft').textContent = `PulseBoard · ${d.hostname} · up ${fmtDur(d.uptime_s)}`;
+  $('footLeft').innerHTML = `PulseBoard · <b>${d.hostname}</b> · up ${fmtDur(d.uptime_s)}`;
   $('footRight').textContent = `updated ${new Date(d.ts).toLocaleTimeString()}`;
 
-  $('cpuPct').textContent = d.cpu_usage_pct + '%';
-  setBar($('cpuBar'), d.cpu_usage_pct);
+  setRing($('cpuRing'), $('cpuVal'), d.cpu_usage_pct, '<small>%</small>');
   $('cpuCores').textContent = d.cores;
   $('load').textContent = d.loadavg.join(' / ');
 
-  $('memPct').textContent = d.mem.usage_pct + '%';
-  setBar($('memBar'), d.mem.usage_pct);
+  setRing($('memRing'), $('memVal'), d.mem.usage_pct, '<small>%</small>');
   $('memUsed').textContent = fmtB(d.mem.used) + ' / ' + fmtB(d.mem.total);
-  $('memAvail').textContent = fmtB(d.mem.available) + ' free';
+  $('memAvail').textContent = fmtB(d.mem.available);
 
-  $('swapPct').textContent = d.mem.swap.usage_pct + '%';
-  setBar($('swapBar'), d.mem.swap.usage_pct);
+  setRing($('swapRing'), $('swapVal'), d.mem.swap.usage_pct, '<small>%</small>');
   $('swapUsed').textContent = fmtB(d.mem.swap.used) + ' / ' + fmtB(d.mem.swap.total);
-  $('swapFree').textContent = fmtB(d.mem.swap.free) + ' free';
+  $('swapFree').textContent = fmtB(d.mem.swap.free);
 
   const root = d.disk.find(x => x.mount === '/') || d.disk[0] || {};
-  $('diskPct').textContent = (root.use_pct ?? 0) + '%';
-  setBar($('diskBar'), root.use_pct ?? 0);
+  setRing($('diskRing'), $('diskVal'), root.use_pct ?? null, '<small>%</small>');
   $('diskUsed').textContent = fmtB(root.used ?? 0) + ' / ' + fmtB(root.size ?? 0);
-  $('diskAvail').textContent = fmtB(root.avail ?? 0) + ' available';
-  $('diskExtra').textContent = d.disk.map(x => `${x.mount}: ${x.use_pct}%`).join(' · ');
+  $('diskAvail').textContent = fmtB(root.avail ?? 0);
+  $('ioSub').textContent = d.disk.map(x => `${x.mount} ${x.use_pct}%`).join(' · ');
 
-  // network
   const total = d.net.total;
-  $('netTotal').textContent = `↓ ${fmtRate(total.rx_bps)}  ↑ ${fmtRate(total.tx_bps)}`;
+  $('netTotal').innerHTML = `↓ ${fmtRate(total.rx_bps)} &nbsp;·&nbsp; ↑ ${fmtRate(total.tx_bps)}`;
   history.rx.push(total.rx_bps); history.tx.push(total.tx_bps);
   if (history.rx.length > MAX) { history.rx.shift(); history.tx.shift(); }
   $('netRow').innerHTML = d.net.interfaces.map(n => `
     <div class="net-if">
-      <div class="ifname">${n.name}${n.link_mbps ? ` · ${n.link_mbps} Mb/s link` : ''}</div>
-      <div class="rate">↓ ${fmtRate(n.rx_bps)} <small>↑ ${fmtRate(n.tx_bps)}</small></div>
-      <div class="meta">total ↓ ${fmtB(n.rx_total_gb * 1024 ** 3)} · ↑ ${fmtB(n.tx_total_gb * 1024 ** 3)}</div>
+      <div class="ifname">${n.name}${n.link_mbps ? `<span class="tag">${n.link_mbps} Mb/s</span>` : ''}</div>
+      <div class="rate">↓ ${fmtRate(n.rx_bps)} <span class="up">↑ ${fmtRate(n.tx_bps)}</span></div>
+      <div class="meta">lifetime ↓ ${fmtB(n.rx_total_gb * 1024 ** 3)} · ↑ ${fmtB(n.tx_total_gb * 1024 ** 3)}</div>
       <canvas data-c="rx"></canvas>
-    </div>`).join('') || '<div class="svc">no non-loopback interfaces</div>';
+    </div>`).join('') || '<div class="svc-note">no non-loopback interfaces</div>';
   requestAnimationFrame(() => {
-    document.querySelectorAll('.net-if canvas').forEach((cv, i) => {
-      drawSpark(cv, history.rx, '#38bdf8');
-    });
+    document.querySelectorAll('.net-if canvas').forEach(cv => drawSpark(cv, history.rx, '#e8b257'));
   });
 
-  // disk io
-  $('ioRow').innerHTML = '<table><thead><tr><th>Device</th><th>Read</th><th>Write</th><th>Total R</th><th>Total W</th></tr></thead><tbody>' +
-    d.diskio.map(x => `<tr><td>${x.dev}</td><td style="color:var(--good)">${fmtRate(x.r_kbps * 1024)}</td><td style="color:var(--warn)">${fmtRate(x.w_kbps * 1024)}</td><td>${x.r_total_gb} GB</td><td>${x.w_total_gb} GB</td></tr>`).join('') +
-    '</tbody></table>';
+  $('ioBody').innerHTML = d.diskio.map(x =>
+    `<tr><td>${x.dev}</td><td style="color:var(--good)">${fmtRate(x.r_kbps * 1024)}</td><td style="color:var(--warn)">${fmtRate(x.w_kbps * 1024)}</td><td>${x.r_total_gb} GB</td><td>${x.w_total_gb} GB</td></tr>`
+  ).join('') || '<tr><td colspan="5" style="color:var(--faint)">no block devices</td></tr>';
 
-  // processes
   $('procBody').innerHTML = d.procs.map(p =>
     `<tr><td>${p.pid}</td><td>${p.name}</td><td>${p.cpu}%</td><td>${p.mem}%</td><td class="cmd">${p.cmd}</td></tr>`
   ).join('');
 
-  // docker services (live)
-  const chips = SERVICES.map(s => s.url ? `<span class="chip up"><a href="${s.url}" target="_blank" rel="noopener">${s.name}</a></span>` : `<span class="chip up">${s.name}</span>`);
+  const chips = SERVICES.map(s => s.url
+    ? `<span class="chip" title="${s.desc}"><a href="${s.url}" target="_blank" rel="noopener">${s.name}</a></span>`
+    : `<span class="chip" title="${s.desc}">${s.name}</span>`);
   if (Array.isArray(d.docker) && d.docker.length) {
-    const running = d.docker.map(c => `<span class="chip up" title="${c.image}">${c.name}${c.status.startsWith('Up') ? '' : ' ⚠'}</span>`).join('');
-    chips.push('<div class="svc">docker containers running: ' + d.docker.length + '</div>');
+    chips.push(`<span class="chip" title="docker daemon">${d.docker.length} containers up</span>`);
     $('svcChips').innerHTML = chips.join('');
   }
 }
@@ -311,26 +439,29 @@ async function tick() {
 }
 
 function start() {
-  btn.classList.remove('idle', 'stop');
+  btn.classList.remove('stop'); btn.classList.add('live');
+  btn.setAttribute('aria-pressed', 'true');
   label.textContent = 'Stop Monitoring';
-  $('idleBanner').classList.add('hidden');
+  pill.classList.add('live'); pillTxt.textContent = 'Live';
+  $('idleState').classList.add('hidden');
   $('dash').classList.remove('dim');
   tick();
   timer = setInterval(tick, 2000);
 }
 function stop() {
   clearInterval(timer); timer = null;
-  btn.classList.add('idle');
+  btn.classList.remove('live', 'stop'); btn.classList.add('idle');
+  btn.setAttribute('aria-pressed', 'false');
   label.textContent = 'Start Monitoring';
-  $('idleBanner').classList.remove('hidden');
+  pill.classList.remove('live'); pillTxt.textContent = 'Idle';
+  $('idleState').classList.remove('hidden');
   $('dash').classList.add('dim');
   $('footRight').textContent = 'monitoring stopped · idle';
 }
 btn.addEventListener('click', () => (timer ? stop() : start()));
 
-// warm the host line without collecting stats (uptime etc. are cheap)
 fetch('/api/health').then(r => r.json()).then(h => {
-  $('footRight').textContent = 'idle · server online since ' + new Date(h.ts).toLocaleTimeString();
+  if (!hasData) $('footRight').textContent = 'idle · server online since ' + new Date(h.ts).toLocaleTimeString();
 }).catch(() => {});
 </script>
 </body>

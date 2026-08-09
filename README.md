@@ -20,6 +20,13 @@ Live at: **https://health.madhur.dev**
 - Network rates and CPU% use two `/proc` samples 1s apart, computed on demand.
 - No dependencies — plain Node.js `http` + `/proc` reads.
 
+## Design
+- Charcoal graphite palette with a warm **gold** accent (no blue) — professional, low-glare dark theme.
+- Ring gauges for CPU / memory / swap / storage; gold sparklines for network throughput.
+- Micro-interactions: spring-like ease, hover lifts, press-down response, pulsing live indicator.
+- `prefers-reduced-motion` respected. Zero dependencies kept — plain HTML/CSS/JS.
+- Redesigned with [emilkowalski/skills](https://github.com/pmadhurn/skills-for-ai) (design skills: emil-design-eng, apple-design, animate).
+
 ## Run
 ```bash
 node server.js            # listens on 127.0.0.1:8123

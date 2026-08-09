@@ -1,6 +1,6 @@
 {
   "name": "pulseboard",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "PulseBoard — zero-idle, on-demand server health dashboard (CPU, memory, swap, storage, network, disk I/O, processes).",
   "main": "server.js",
   "scripts": {
