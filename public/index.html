@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#060607">
-<title>PULSEBOARD v2 — Telemetry</title>
+<title>PULSEBOARD v2.2 — Mission Control</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230c0c0e'/%3E%3Cpath d='M4 18h5l2.5-7 5 12 3-8 1.5 3H28' fill='none' stroke='%23f5c14e' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
   :root{
@@ -24,14 +24,18 @@
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
   body{background:var(--bg);color:var(--txt);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+  ::selection{background:rgba(245,193,78,.25)}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#1c1c22;border-radius:5px;border:2px solid var(--bg)}
 
+  /* ── atmosphere ─────────────────────────── */
   .bg-grid{position:fixed;inset:0;pointer-events:none;z-index:0;
     background-image:linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
     background-size:44px 44px;
     mask-image:radial-gradient(85% 70% at 50% 0%,#000 30%,transparent 100%);
     -webkit-mask-image:radial-gradient(85% 70% at 50% 0%,#000 30%,transparent 100%)}
   .bg-glow{position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(55% 45% at 50% -5%,var(--glow),transparent 65%);transition:background .6s var(--ease)}
-  .scan{position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.5;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,.12) 3px 4px)}
+  .scan{position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.05;background:repeating-linear-gradient(0deg,transparent 0 3px,#000 3px 4px)}
   .wrap{position:relative;z-index:1;max-width:1160px;margin:0 auto;padding:20px 22px 40px}
 
   /* ── command bar ─────────────────────────── */
@@ -45,6 +49,7 @@
     box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 0 18px var(--glow);transition:color .4s,box-shadow .4s}
   .wordmark{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.22em;white-space:nowrap}
   .wordmark .v{color:var(--gold);transition:color .4s}
+  .wordmark .ver{font-size:9px;color:var(--gold);letter-spacing:.08em;margin-left:7px;vertical-align:2px;transition:color .4s}
   .wordmark .cursor{display:inline-block;width:7px;height:13px;background:var(--gold);margin-left:6px;vertical-align:-2px;animation:blink 1.1s steps(1) infinite;transition:background .4s}
   @keyframes blink{50%{opacity:0}}
   .meta{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.06em;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -57,9 +62,10 @@
   .led.live .l{background:var(--gold);box-shadow:0 0 10px var(--gold);animation:blink 1.6s steps(1) infinite}
   .iconbtn{width:38px;height:38px;flex:none;cursor:pointer;border:1px solid var(--line);border-radius:8px;
     display:grid;place-items:center;color:var(--muted);background:var(--panel2);
-    transition:color .2s,border-color .2s,transform .12s var(--ease)}
+    transition:color .2s,border-color .2s,transform .12s var(--ease),opacity .3s}
   .iconbtn:hover{color:var(--gold);border-color:var(--line2)}
   .iconbtn:active{transform:scale(.93)}
+  .iconbtn.off{opacity:.35;pointer-events:none}
   .btn{display:inline-flex;align-items:center;gap:9px;cursor:pointer;border:0;
     font-family:var(--mono);font-weight:700;font-size:12px;letter-spacing:.16em;text-transform:uppercase;
     color:#171204;background:linear-gradient(160deg,var(--gold2),var(--gold));
@@ -78,8 +84,8 @@
     padding:64px 24px;text-align:center;margin-bottom:16px;
     background:linear-gradient(180deg,rgba(12,12,14,.6),rgba(6,6,7,0))}
   .standby .prompt{font-family:var(--mono);font-size:clamp(14px,2.2vw,18px);color:var(--muted)}
-  .standby .prompt b{color:var(--gold);font-weight:700}
-  .standby .prompt .blk{display:inline-block;width:9px;height:16px;background:var(--gold);vertical-align:-2px;margin-left:4px;animation:blink 1.1s steps(1) infinite}
+  .standby .prompt b{color:var(--gold);font-weight:700;transition:color .4s}
+  .standby .prompt .blk{display:inline-block;width:9px;height:16px;background:var(--gold);vertical-align:-2px;margin-left:4px;animation:blink 1.1s steps(1) infinite;transition:background .4s}
   .standby .hint{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.14em;margin-top:12px;text-transform:uppercase}
 
   /* ── hero telemetry ──────────────────────── */
@@ -113,6 +119,7 @@
   .stat.warn .v{color:var(--amber)}
   .stat.bad .v{color:var(--red)}
   .stat.gold .v{color:var(--gold);transition:color .4s}
+  .stat.gold .k i{background:var(--gold);box-shadow:0 0 8px var(--glow);transition:background .4s}
 
   /* ── modules ─────────────────────────────── */
   .mods{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
@@ -122,9 +129,15 @@
   .mod:hover{border-color:var(--line2);transform:translateY(-1px);box-shadow:0 12px 34px rgba(0,0,0,.5)}
   .mod.w6{grid-column:span 6}.mod.w12{grid-column:span 12}
   .mod .mhead{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.015)}
+  .mod .mhead .mdots{display:flex;gap:4px;flex:none}
+  .mod .mhead .mdots i{width:7px;height:7px;border-radius:50%}
+  .mod .mhead .mdots i:nth-child(1){background:var(--red);opacity:.8}
+  .mod .mhead .mdots i:nth-child(2){background:var(--gold);opacity:.8;transition:background .4s}
+  .mod .mhead .mdots i:nth-child(3){background:var(--emerald);opacity:.8}
   .mod .mhead .tag{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.2em;color:var(--gold);text-transform:uppercase;transition:color .4s}
   .mod .mhead .desc{font-family:var(--mono);font-size:9.5px;color:var(--faint);letter-spacing:.08em;margin-left:auto;text-transform:uppercase}
   .mod .mbody{padding:12px}
+  .mod.edge .mbody{padding:8px 0 0}
   .mrow{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:11.5px;color:var(--muted);padding:5px 0;border-bottom:1px dashed rgba(255,255,255,.05)}
   .mrow:last-child{border-bottom:0}
   .mrow b{color:var(--txt);font-weight:600;font-variant-numeric:tabular-nums}
@@ -134,9 +147,31 @@
   .hbar.ok>i{background:linear-gradient(90deg,#2bb87a,var(--emerald))}
   .hbar.warn>i{background:linear-gradient(90deg,#f08a1f,var(--amber))}
   .hbar.bad>i{background:linear-gradient(90deg,#e5403e,var(--red))}
+  .proc-total{margin-bottom:6px}
+  .proc-total .mrow{border-bottom:0;padding:2px 0}
+  .proc-total .mrow b{font-size:13px;color:var(--gold);transition:color .4s}
+  .crow{display:flex;align-items:center;gap:8px;padding:4px 0;font-family:var(--mono);font-size:10.5px;border-bottom:1px dashed rgba(255,255,255,.05)}
+  .crow:last-child{border-bottom:0}
+  .crow .cn{color:var(--faint);width:46px;flex:none;letter-spacing:.05em}
+  .crow .hbar{flex:1;margin:0}
+  .crow .cp{width:48px;text-align:right;flex:none;font-variant-numeric:tabular-nums;color:var(--muted)}
+  .crow .cp.ok{color:var(--emerald)}
+  .crow .cp.warn{color:var(--amber)}
+  .crow .cp.bad{color:var(--red)}
+  .srow{padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.05)}
+  .srow:last-child{border-bottom:0}
+  .srow .shead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-family:var(--mono);font-size:11px;margin-bottom:5px}
+  .srow .sn{color:var(--gold);font-weight:600;transition:color .4s}
+  .srow .sp{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .srow .sp.ok{color:var(--emerald)}
+  .srow .sp.warn{color:var(--amber)}
+  .srow .sp.bad{color:var(--red)}
+  .sparkbox{height:44px;margin:2px 0 8px;position:relative}
+  #spark{width:100%;height:100%;display:block}
   .ifrow{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.05)}
   .ifrow:last-child{border-bottom:0}
   .ifrow .n{color:var(--gold);transition:color .4s}
+  .ifrow .lk{color:var(--faint)}
   .ifrow .r{color:var(--emerald);font-variant-numeric:tabular-nums}
   .ifrow .t{color:var(--faint);font-variant-numeric:tabular-nums}
   table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
@@ -145,13 +180,17 @@
   tbody tr{transition:background .15s}
   tbody tr:hover{background:rgba(255,255,255,.03)}
   td .cmd{color:var(--faint);font-family:var(--sans);font-size:10.5px}
-  td.gold{color:var(--gold)} td.green{color:var(--emerald)} td.orange{color:var(--amber)}
-  .chip{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--muted);
-    background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 11px;margin:0 6px 8px 0;transition:border-color .2s,color .2s}
-  .chip:hover{border-color:var(--line2)}
-  .chip a{color:inherit;text-decoration:none}
-  .chip a:hover{color:var(--gold)}
-  .chip .up{color:var(--emerald)}
+  td.gold{color:var(--gold)} td.green{color:var(--emerald)} td.orange{color:var(--amber)} td.bad{color:var(--red)}
+  td.empty{color:var(--faint);text-align:center;padding:16px 8px}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
+  .dot.up{background:var(--emerald);box-shadow:0 0 8px rgba(61,214,140,.7)}
+  .dot.dn{background:var(--red);box-shadow:0 0 8px rgba(255,92,92,.7)}
+  .dot.warn{background:var(--amber);box-shadow:0 0 8px rgba(255,171,61,.7)}
+  .stog{margin-left:auto;display:inline-flex;gap:3px;flex:none}
+  .stog button{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+    background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:3px 9px;cursor:pointer;transition:color .2s,border-color .2s}
+  .stog button:hover{color:var(--muted);border-color:var(--line2)}
+  .stog button.sel{color:var(--gold);border-color:var(--line2);font-weight:700}
 
   /* ── ticker ──────────────────────────────── */
   .ticker{margin-top:14px;background:#070708;border:1px solid var(--line);border-radius:8px;font-family:var(--mono);font-size:10.5px;color:var(--faint);overflow:hidden}
@@ -210,6 +249,15 @@
   .fadein{animation:fadein .5s var(--ease) both}
   @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
+  /* ── compact mode ────────────────────────── */
+  html[data-compact="1"] .wrap { padding: 12px 14px 32px; }
+  html[data-compact="1"] .cmdbar { padding: 8px 10px; }
+  html[data-compact="1"] .mod .mbody { padding: 8px; }
+  html[data-compact="1"] .stat .v { font-size: 18px; }
+  html[data-compact="1"] .chartbox { height: 160px; }
+  html[data-compact="1"] .ticker .lines { max-height: 64px; }
+  html[data-compact="1"] table td, html[data-compact="1"] table th { padding: 4px 6px; font-size: 10px; }
+
   @media (max-width:900px){.mod{grid-column:span 6}}
   @media (max-width:560px){.mod{grid-column:span 12}.chartbox{height:160px}}
   @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
@@ -219,27 +267,33 @@
 <div class="bg-grid"></div><div class="bg-glow"></div><div class="scan"></div>
 <div class="wrap">
 
-  <!-- command bar -->
+  <!-- ── command bar ─────────────────────────── -->
   <div class="cmdbar">
     <div class="brand">
       <div class="logo">
         <svg width="18" height="18" viewBox="0 0 32 32" fill="none"><path d="M4 18h5l2.5-7 5 12 3-8 1.5 3H28" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
-      <div>
-        <div class="wordmark">PULSE<span class="v">BOARD</span><span class="cursor"></span></div>
+      <div style="min-width:0">
+        <div class="wordmark">PULSE<span class="v">BOARD</span><span class="ver">v2</span><span class="cursor"></span></div>
         <div class="meta" id="hostLine">waiting for uplink…</div>
       </div>
     </div>
     <div class="cmdraw">
       <span class="led" id="led"><span class="l"></span><span id="ledTxt">IDLE</span></span>
-      <button class="iconbtn" id="optBtn" title="Options (O)" aria-label="Options">
+      <button class="iconbtn" id="expBtn" title="Export snapshot" aria-label="Export snapshot" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      </button>
+      <button class="iconbtn" id="optBtn" title="Options (O)" aria-label="Options" type="button">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
-      <button class="btn" id="monBtn" aria-pressed="false"><span class="dot"></span><span id="monLabel">START MONITOR</span></button>
+      <button class="iconbtn" id="fsBtn" title="Fullscreen" aria-label="Toggle fullscreen" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+      </button>
+      <button class="btn" id="monBtn" aria-pressed="false" type="button"><span class="dot"></span><span id="monLabel">START MONITOR</span></button>
     </div>
   </div>
 
-  <!-- standby -->
+  <!-- ── standby ─────────────────────────────── -->
   <div class="standby" id="standby">
     <div class="prompt"><b>●</b> STANDBY — telemetry offline. press <b>[ START MONITOR ]</b> to begin sampling<span class="blk"></span></div>
     <div class="hint">zero-idle design · no background sampling · data only while you watch</div>
@@ -247,7 +301,7 @@
 
   <div id="dash" class="dim">
 
-    <!-- hero chart -->
+    <!-- ── hero telemetry ─────────────────────── -->
     <section class="hero fadein">
       <div class="win">
         <div class="dots"><i></i><i></i><i></i></div>
@@ -263,7 +317,7 @@
         <canvas id="chart"></canvas>
         <span class="chart-note" id="chartNote">T-90s · normalized % of peak</span>
       </div>
-      <div class="strip" id="strip">
+      <div class="strip">
         <div class="stat" id="sCpu"><div class="k"><span>CPU</span><i></i></div><div class="v">—<small>%</small></div></div>
         <div class="stat" id="sMem"><div class="k"><span>MEM</span><i></i></div><div class="v">—<small>%</small></div></div>
         <div class="stat" id="sSwap"><div class="k"><span>SWAP</span><i></i></div><div class="v">—<small>%</small></div></div>
@@ -273,20 +327,40 @@
       </div>
     </section>
 
-    <!-- modules -->
+    <!-- ── modules ─────────────────────────────── -->
     <div class="mods">
+
       <section class="mod fadein">
-        <div class="mhead"><span class="tag">PROC</span><span class="desc">processor</span></div>
+        <div class="mhead"><span class="mdots"><i></i><i></i><i></i></span><span class="tag">SYS</span><span class="desc">system info</span></div>
         <div class="mbody">
+          <div class="mrow"><span>hostname</span><b id="mHost">—</b></div>
+          <div class="mrow"><span>os</span><b id="mOs">—</b></div>
+          <div class="mrow"><span>kernel</span><b id="mKernel">—</b></div>
+          <div class="mrow"><span>arch</span><b id="mArch">—</b></div>
+          <div class="mrow"><span>cpu model</span><b id="mCpuModel">—</b></div>
+          <div class="mrow"><span>ip</span><b id="mIp">—</b></div>
+          <div class="mrow"><span>processes</span><b id="mPcount">—</b></div>
+          <div class="mrow"><span>uptime</span><b class="gold" id="mUp">—</b></div>
+        </div>
+      </section>
+
+      <section class="mod fadein">
+        <div class="mhead"><span class="mdots"><i></i><i></i><i></i></span><span class="tag">PROC</span><span class="desc">processor</span></div>
+        <div class="mbody">
+          <div class="proc-total">
+            <div class="mrow"><span>total cpu</span><b id="mTotCpu">—</b></div>
+            <div class="hbar" id="totBar"><i style="width:0%"></i></div>
+          </div>
+          <div id="coreBars"></div>
           <div class="mrow"><span>cores</span><b id="mCores">—</b></div>
           <div class="mrow"><span>load 1m</span><b id="mLoad1">—</b></div>
           <div class="mrow"><span>load 5m</span><b id="mLoad5">—</b></div>
           <div class="mrow"><span>load 15m</span><b id="mLoad15">—</b></div>
-          <div class="mrow"><span>uptime</span><b id="mUp">—</b></div>
         </div>
       </section>
+
       <section class="mod fadein">
-        <div class="mhead"><span class="tag">MEM</span><span class="desc">working set</span></div>
+        <div class="mhead"><span class="mdots"><i></i><i></i><i></i></span><span class="tag">MEM</span><span class="desc">working set</span></div>
         <div class="mbody">
           <div class="hbar" id="memBar"><i style="width:0%"></i></div>
           <div class="mrow"><span>used</span><b id="mMemUsed">—</b></div>
@@ -295,8 +369,9 @@
           <div class="mrow"><span>total</span><b id="mMemTotal">—</b></div>
         </div>
       </section>
+
       <section class="mod fadein">
-        <div class="mhead"><span class="tag">SWAP</span><span class="desc">overflow</span></div>
+        <div class="mhead"><span class="mdots"><i></i><i></i><i></i></span><span class="tag">SWAP</span><span class="desc">overflow</span></div>
         <div class="mbody">
           <div class="hbar" id="swapBar"><i style="width:0%"></i></div>
           <div class="mrow"><span>used</span><b id="mSwapUsed">—</b></div>
@@ -304,29 +379,51 @@
           <div class="mrow"><span>total</span><b id="mSwapTotal">—</b></div>
         </div>
       </section>
+
       <section class="mod fadein">
-        <div class="mhead"><span class="tag">NET</span><span class="desc">interfaces</span></div>
-        <div class="mbody" id="mNet"></div>
+        <div class="mhead"><span class="mdots"><i></i><i></i><i></i></span><span class="tag">STOR</span><span class="desc">storage per mount</span></div>
+        <div class="mbody" id="storBox"></div>
       </section>
-      <section class="mod w6 fadein">
-        <div class="mhead"><span class="tag">IO</span><span class="desc">block devices · live</span></div>
-        <div class="mbody" style="padding:8px 0 0">
-          <table><thead><tr><th>Dev</th><th>Rd</th><th>Wr</th><th>Total rd</th><th>Total wr</th></tr></thead><tbody id="ioBody"></tbody></table>
+
+      <section class="mod fadein">
+        <div class="mhead"><span class="mdots"><i></i><i></i><i></i></span><span class="tag">NET</span><span class="desc">interfaces</span></div>
+        <div class="mbody">
+          <div class="sparkbox"><canvas id="spark"></canvas></div>
+          <div id="netRows"></div>
         </div>
       </section>
-      <section class="mod w6 fadein">
-        <div class="mhead"><span class="tag">TOP</span><span class="desc">processes by cpu</span></div>
-        <div class="mbody" style="padding:8px 0 0">
+
+      <section class="mod w6 edge fadein">
+        <div class="mhead"><span class="mdots"><i></i><i></i><i></i></span><span class="tag">IO</span><span class="desc">block devices · live</span></div>
+        <div class="mbody">
+          <table><thead><tr><th>Dev</th><th>Read/s</th><th>Write/s</th><th>Total rd</th><th>Total wr</th></tr></thead><tbody id="ioBody"></tbody></table>
+        </div>
+      </section>
+
+      <section class="mod w6 edge fadein">
+        <div class="mhead"><span class="mdots"><i></i><i></i><i></i></span><span class="tag">TOP</span><span class="desc">processes</span><span class="stog" id="procSortTog"><button data-k="cpu" class="sel" type="button">CPU</button><button data-k="mem" type="button">MEM</button></span></div>
+        <div class="mbody">
           <table><thead><tr><th>PID</th><th>Proc</th><th>CPU</th><th>MEM</th><th>Command</th></tr></thead><tbody id="procBody"></tbody></table>
         </div>
       </section>
-      <section class="mod w12 fadein">
-        <div class="mhead"><span class="tag">SVC</span><span class="desc">deployed services</span></div>
-        <div class="mbody" id="svcBox"></div>
+
+      <section class="mod w6 edge fadein">
+        <div class="mhead"><span class="mdots"><i></i><i></i><i></i></span><span class="tag">DOCKER</span><span class="desc">containers</span></div>
+        <div class="mbody">
+          <table><thead><tr><th>Name</th><th>State</th><th>Image</th><th>Status</th><th>Ports</th></tr></thead><tbody id="dockerBody"></tbody></table>
+        </div>
       </section>
+
+      <section class="mod w6 edge fadein">
+        <div class="mhead"><span class="mdots"><i></i><i></i><i></i></span><span class="tag">SVC</span><span class="desc">service health</span></div>
+        <div class="mbody">
+          <table><thead><tr><th>Service</th><th>Status</th><th>Latency</th><th>Endpoint</th></tr></thead><tbody id="svcBody"></tbody></table>
+        </div>
+      </section>
+
     </div>
 
-    <!-- ticker -->
+    <!-- ── event log ───────────────────────────── -->
     <div class="ticker">
       <div class="thead"><span class="live-dot"></span>EVENT LOG</div>
       <div class="lines" id="logLines"></div>
@@ -335,17 +432,17 @@
 
   <footer>
     <span id="fLeft">PULSEBOARD v2 · ZERO-IDLE TELEMETRY</span>
-    <span id="fRight"></span>
+    <span id="fRight">stream stopped · idle</span>
   </footer>
 </div>
 
-<!-- options -->
+<!-- ── options ────────────────────────────────── -->
 <div class="overlay" id="optOverlay" role="dialog" aria-modal="true" aria-label="Options">
   <div class="optwin">
     <div class="win">
       <div class="dots"><i></i><i></i><i></i></div>
       <span class="title">OPTIONS //</span>
-      <button class="close" id="optClose" aria-label="Close">✕</button>
+      <button class="close" id="optClose" aria-label="Close" type="button">✕</button>
     </div>
     <div class="optbody">
       <div class="optgroup">
@@ -355,26 +452,33 @@
       <div class="optgroup">
         <div class="ol">POLL RATE</div>
         <div class="seg" id="pollSeg">
-          <button data-v="1000">1s</button>
-          <button data-v="2000">2s</button>
-          <button data-v="5000">5s</button>
+          <button data-v="1000" type="button">1s</button>
+          <button data-v="2000" type="button">2s</button>
+          <button data-v="5000" type="button">5s</button>
         </div>
       </div>
       <div class="optgroup">
         <div class="ol">CHART WINDOW</div>
         <div class="seg" id="winSeg">
-          <button data-v="60">60s</button>
-          <button data-v="90">90s</button>
-          <button data-v="180">180s</button>
+          <button data-v="60" type="button">60s</button>
+          <button data-v="90" type="button">90s</button>
+          <button data-v="180" type="button">180s</button>
         </div>
       </div>
       <div class="optgroup">
         <div class="ol">CHART SERIES</div>
         <div id="seriesTog"></div>
       </div>
+      <div class="optgroup">
+        <div class="ol">COMPACT MODE</div>
+        <div class="seg" id="compactSeg">
+          <button data-v="0" type="button">OFF</button>
+          <button data-v="1" type="button">ON</button>
+        </div>
+      </div>
       <div class="optfoot">
-        <span class="hint" id="optHint">settings saved locally</span>
-        <button class="reset" id="optReset">RESET DEFAULTS</button>
+        <span class="hint">settings saved locally</span>
+        <button class="reset" id="optReset" type="button">RESET DEFAULTS</button>
       </div>
     </div>
   </div>
@@ -383,8 +487,9 @@
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const btn=$('monBtn'),label=$('monLabel'),led=$('led'),ledTxt=$('ledTxt');
-let timer=null,log=[];
+let timer=null,upTimer=null,log=[],pollN=0,lastStats=null,lastTs=0,procSort='cpu';
 
 /* ── options ─────────────────────────────────── */
 const THEMES={
@@ -394,8 +499,8 @@ const THEMES={
   ember:{name:'EMBER',color:'#ff6b4a'},
   mono:{name:'MONO',color:'#d6d6da'},
 };
-const DEFAULTS={theme:'gold',poll:2000,window:90,series:{cpu:true,mem:true,rx:true,tx:true}};
-let OPT={...DEFAULTS,series:{...DEFAULTS.series}};
+const DEFAULTS={theme:'gold',poll:2000,window:90,series:{cpu:true,mem:true,rx:true,tx:true},compact:false};
+let OPT={...DEFAULTS,series:{...DEFAULTS.series},compact:DEFAULTS.compact};
 try{
   const saved=JSON.parse(localStorage.getItem('pulseboard-opts')||'{}');
   OPT={...DEFAULTS,series:{...DEFAULTS.series},...saved,series:{...DEFAULTS.series,...(saved.series||{})}};
@@ -415,71 +520,84 @@ function series(){return SERIES_DEF.filter(s=>OPT.series[s.key])}
 function applyTheme(){
   const t=THEMES[OPT.theme]||THEMES.gold;
   document.documentElement.dataset.theme=OPT.theme;
-  // chart cpu line follows the accent
-  SERIES_DEF[0].color=t.color;
-  SERIES_DEF[0].fill=t.color.replace('#','rgba(')+','; // placeholder; fixed below
   const hex=t.color.slice(1);
   const r=parseInt(hex.slice(0,2),16),g=parseInt(hex.slice(2,4),16),b=parseInt(hex.slice(4,6),16);
+  SERIES_DEF[0].color=t.color;
   SERIES_DEF[0].fill=`rgba(${r},${g},${b},`;
-  // legend swatch for cpu
   const cpuLeg=document.querySelector('#legend [data-s="cpu"] i');
   if(cpuLeg)cpuLeg.style.background=t.color;
-  // option window swatches
-  renderThemeSws();
+}
+function applyCompact(){
+  if(OPT.compact)document.documentElement.setAttribute('data-compact','1');
+  else document.documentElement.removeAttribute('data-compact');
 }
 function renderThemeSws(){
   $('themeSws').innerHTML=Object.entries(THEMES).map(([k,t])=>
-    `<button class="sw ${OPT.theme===k?'sel':''}" data-k="${k}" style="color:${t.color};background:linear-gradient(150deg,#17171b,#0d0d10)" title="${t.name}"><span class="swdot" style="background:${t.color}"></span><span class="nm">${t.name}</span></button>`
+    `<button class="sw ${OPT.theme===k?'sel':''}" data-k="${k}" style="color:${t.color};background:linear-gradient(150deg,#17171b,#0d0d10)" title="${t.name}" type="button"><span class="swdot" style="background:${t.color}"></span><span class="nm">${t.name}</span></button>`
   ).join('');
 }
 function renderSeg(){
   document.querySelectorAll('#pollSeg button').forEach(b=>b.classList.toggle('sel',+b.dataset.v===OPT.poll));
   document.querySelectorAll('#winSeg button').forEach(b=>b.classList.toggle('sel',+b.dataset.v===OPT.window));
+  document.querySelectorAll('#compactSeg button').forEach(b=>b.classList.toggle('sel',(+b.dataset.v===1)===OPT.compact));
   const defs={cpu:{c:'#f5c14e',n:'CPU'},mem:{c:'#3dd68c',n:'MEM'},rx:{c:'#ffab3d',n:'NET↓'},tx:{c:'#a78bfa',n:'NET↑'}};
   $('seriesTog').innerHTML=Object.keys(defs).map(k=>
-    `<button class="tog ${OPT.series[k]?'sel':''}" data-k="${k}"><span class="sq" style="background:${defs[k].c}"></span>${defs[k].n}</button>`
+    `<button class="tog ${OPT.series[k]?'sel':''}" data-k="${k}" type="button"><span class="sq" style="background:${defs[k].c}"></span>${defs[k].n}</button>`
   ).join('');
-  // legend
   document.querySelectorAll('#legend [data-s]').forEach(sp=>{
     const k=sp.dataset.s;sp.classList.toggle('on',OPT.series[k]);
   });
 }
-function resizeHist(){
+function renderOpts(){renderThemeSws();renderSeg()}
+function applyOpts(){
+  applyTheme();
+  applyCompact();
+  MAX=OPT.window;
   ['cpu','mem','rx','tx'].forEach(k=>{while(H[k].length>MAX)H[k].shift()});
   $('chartNote').textContent=`T-${MAX}s · normalized % of peak`;
-  drawChart();
-}
-function restartTimer(){
+  renderOpts();
   if(timer){clearInterval(timer);timer=setInterval(tick,OPT.poll)}
+  drawChart();
+  drawSpark();
 }
 function bindOptions(){
   $('themeSws').addEventListener('click',e=>{
     const sw=e.target.closest('.sw');if(!sw)return;
-    OPT.theme=sw.dataset.k;save();applyTheme();renderSeg();drawChart();
+    OPT.theme=sw.dataset.k;save();applyOpts();
   });
   $('pollSeg').addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b)return;
-    OPT.poll=+b.dataset.v;save();renderSeg();restartTimer();
+    OPT.poll=+b.dataset.v;save();applyOpts();
   });
   $('winSeg').addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b)return;
-    OPT.window=+b.dataset.v;MAX=OPT.window;save();renderSeg();resizeHist();
+    OPT.window=+b.dataset.v;save();applyOpts();
   });
   $('seriesTog').addEventListener('click',e=>{
     const b=e.target.closest('.tog');if(!b)return;
-    OPT.series[b.dataset.k]=!OPT.series[b.dataset.k];save();renderSeg();drawChart();
+    OPT.series[b.dataset.k]=!OPT.series[b.dataset.k];save();applyOpts();
+  });
+  $('compactSeg').addEventListener('click',e=>{
+    const b=e.target.closest('button');if(!b)return;
+    OPT.compact=(+b.dataset.v===1);save();applyOpts();
+  });
+  $('legend').addEventListener('click',e=>{
+    const sp=e.target.closest('[data-s]');if(!sp)return;
+    OPT.series[sp.dataset.s]=!OPT.series[sp.dataset.s];save();applyOpts();
   });
   $('optReset').addEventListener('click',()=>{
-    OPT={...DEFAULTS,series:{...DEFAULTS.series}};MAX=OPT.window;save();
-    applyTheme();renderSeg();resizeHist();restartTimer();
+    OPT={...DEFAULTS,series:{...DEFAULTS.series},compact:DEFAULTS.compact};save();applyOpts();
   });
 }
-function openOpts(){ $('optOverlay').classList.add('open'); }
-function closeOpts(){ $('optOverlay').classList.remove('open'); }
+function openOpts(){$('optOverlay').classList.add('open')}
+function closeOpts(){$('optOverlay').classList.remove('open')}
 $('optBtn').addEventListener('click',openOpts);
 $('optClose').addEventListener('click',closeOpts);
 $('optOverlay').addEventListener('click',e=>{if(e.target===$('optOverlay'))closeOpts()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeOpts();if(e.key.toLowerCase()==='o'&&!e.metaKey&&!e.ctrlKey&&!e.altKey)openOpts()});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeOpts();
+  if(e.key.toLowerCase()==='o'&&!e.metaKey&&!e.ctrlKey&&!e.altKey)openOpts();
+});
 
 /* ── fmt ────────────────────────────────────── */
 const fmtB=b=>{if(b>=1024**3)return(b/1024**3).toFixed(2)+' GiB';if(b>=1024**2)return(b/1024**2).toFixed(1)+' MiB';if(b>=1024)return(b/1024).toFixed(0)+' KiB';return b+' B'};
@@ -496,7 +614,7 @@ function drawChart(){
   const n=H.cpu.length;if(!n)return;
   const pad=6,step=W/(MAX-1);
   ctx.strokeStyle='rgba(255,255,255,.045)';ctx.lineWidth=1;
-  for(let g=0;g<=4;g++){const y=pad+(Hh-pad*2)*g/4;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+  for(let g=0;g<4;g++){const y=pad+(Hh-pad*2)*g/3;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
   series().forEach(s=>{
     const arr=H[s.key];if(!arr.length)return;
     const peak=Math.max(...arr,1);
@@ -513,8 +631,29 @@ function drawChart(){
   const ex=W-pad/2;
   ctx.strokeStyle='rgba(245,193,78,.5)';ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(ex,pad);ctx.lineTo(ex,Hh-pad);ctx.stroke();ctx.setLineDash([]);
 }
+function drawSpark(){
+  const cv=$('spark');if(!cv)return;
+  const ctx=cv.getContext('2d');
+  const W=cv.width=cv.clientWidth*devicePixelRatio;
+  const Hh=cv.height=cv.clientHeight*devicePixelRatio;
+  ctx.clearRect(0,0,W,Hh);
+  if(!H.rx.length)return;
+  const pad=3;
+  const pts=k=>{
+    const arr=H[k].slice(-60);
+    const peak=Math.max(...arr,1);
+    return arr.map((v,i)=>{const x=pad+(W-pad*2)*i/(arr.length>1?arr.length-1:1);const y=Hh-pad-(v/peak)*(Hh-pad*2);return[x,y]});
+  };
+  [['rx',SERIES_DEF[2].color],['tx',SERIES_DEF[3].color]].forEach(([k,c])=>{
+    const p=pts(k);
+    ctx.beginPath();
+    p.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
+    ctx.strokeStyle=c;ctx.lineWidth=1.2*devicePixelRatio;ctx.lineJoin='round';
+    ctx.shadowColor=c;ctx.shadowBlur=4*devicePixelRatio;ctx.stroke();ctx.shadowBlur=0;
+  });
+}
 
-/* ── render ─────────────────────────────────── */
+/* ── render helpers ─────────────────────────── */
 function setStat(id,pct,clsName,suffix){
   const el=$(id);el.className='stat '+clsName;
   el.querySelector('.v').innerHTML=(pct===null||pct===undefined?'—':Math.round(pct))+(suffix||'');
@@ -523,10 +662,91 @@ function setBar(el,pct){
   el.className='hbar '+cls(pct);
   el.firstElementChild.style.width=Math.min(100,Math.max(0,pct))+'%';
 }
+function renderSys(d){
+  $('mHost').textContent=d.hostname;
+  $('mOs').textContent=d.os;
+  $('mKernel').textContent=d.kernel;
+  $('mArch').textContent=d.arch;
+  $('mCpuModel').textContent=d.cpu_model||'—';
+  $('mIp').textContent=d.ip||'—';
+  $('mPcount').textContent=d.process_count;
+  $('mUp').textContent=fmtDur(d.uptime_s);
+}
+function renderProc(d){
+  $('mTotCpu').textContent=d.cpu_usage_pct+'%';
+  setBar($('totBar'),d.cpu_usage_pct);
+  $('coreBars').innerHTML=(d.cpu_cores||[]).map(c=>{
+    const c2=cls(c.usage_pct);
+    return `<div class="crow"><span class="cn">core ${c.core}</span><div class="hbar ${c2}"><i style="width:${Math.min(100,Math.max(0,c.usage_pct))}%"></i></div><span class="cp ${c2}">${c.usage_pct}%</span></div>`;
+  }).join('')||'<div class="mrow"><span>no core data</span></div>';
+  $('mCores').textContent=d.cores;
+  $('mLoad1').textContent=d.loadavg[0];
+  $('mLoad5').textContent=d.loadavg[1];
+  $('mLoad15').textContent=d.loadavg[2];
+}
+function renderMem(d){
+  setBar($('memBar'),d.mem.usage_pct);
+  $('mMemUsed').textContent=fmtB(d.mem.used)+' / '+fmtB(d.mem.total);
+  $('mMemAvail').textContent=fmtB(d.mem.available);
+  $('mMemCache').textContent=fmtB(d.mem.buff_cache);
+  $('mMemTotal').textContent=fmtB(d.mem.total);
+}
+function renderSwap(d){
+  setBar($('swapBar'),d.mem.swap.usage_pct);
+  $('mSwapUsed').textContent=fmtB(d.mem.swap.used)+' / '+fmtB(d.mem.swap.total);
+  $('mSwapFree').textContent=fmtB(d.mem.swap.free);
+  $('mSwapTotal').textContent=fmtB(d.mem.swap.total);
+}
+function renderStor(d){
+  $('storBox').innerHTML=(d.disk||[]).map(x=>{
+    const c2=cls(x.use_pct);
+    return `<div class="srow"><div class="shead"><span class="sn">${esc(x.mount)}</span><span class="sp ${c2}">${x.use_pct}% · ${fmtB(x.used)} / ${fmtB(x.size)}</span></div><div class="hbar ${c2}"><i style="width:${Math.min(100,Math.max(0,x.use_pct))}%"></i></div></div>`;
+  }).join('')||'<div class="mrow"><span>no mounts</span></div>';
+}
+function renderNet(d){
+  $('netRows').innerHTML=(d.net.interfaces||[]).map(n=>
+    `<div class="ifrow"><span class="n">${esc(n.name)}${n.link_mbps?` <span class="lk">${n.link_mbps}M</span>`:''}</span><span class="r">↓${fmtRate(n.rx_bps)}</span><span class="t">↑${fmtRate(n.tx_bps)}</span></div>`
+  ).join('')||'<div class="mrow"><span>no interfaces</span></div>';
+  drawSpark();
+}
+function renderIo(d){
+  $('ioBody').innerHTML=(d.diskio||[]).map(x=>
+    `<tr><td>${esc(x.dev)}</td><td class="green">${fmtRate(x.r_kbps*1024)}</td><td class="orange">${fmtRate(x.w_kbps*1024)}</td><td>${x.r_total_gb}G</td><td>${x.w_total_gb}G</td></tr>`
+  ).join('')||'<tr><td colspan="5" class="empty">no block devices</td></tr>';
+}
+function renderTop(d){
+  const procs=[...(d.procs||[])].sort((a,b)=>procSort==='mem'?b.mem-a.mem:b.cpu-a.cpu);
+  $('procBody').innerHTML=procs.map(p=>
+    `<tr><td>${p.pid}</td><td>${esc(p.name)}</td><td class="gold">${p.cpu}%</td><td class="${cls(p.mem)}">${p.mem}%</td><td class="cmd">${esc(p.cmd)}</td></tr>`
+  ).join('')||'<tr><td colspan="5" class="empty">no process data</td></tr>';
+  document.querySelectorAll('#procSortTog button').forEach(b=>b.classList.toggle('sel',b.dataset.k===procSort));
+}
+function renderDocker(d){
+  $('dockerBody').innerHTML=(d.docker||[]).map(c=>{
+    const up=c.state==='running';
+    return `<tr><td class="gold">${esc(c.name)}</td><td><span class="dot ${up?'up':'dn'}"></span>${up?'running':esc(c.state||'down')}</td><td class="cmd">${esc(c.image)}</td><td>${esc(c.status)}</td><td class="cmd">${esc(c.ports)||'—'}</td></tr>`;
+  }).join('')||'<tr><td colspan="5" class="empty">no containers</td></tr>';
+}
+function renderSvc(d){
+  $('svcBody').innerHTML=(d.services||[]).map(s=>{
+    let stTxt,stCls,dotCls;
+    if(s.status==='up'){stTxt='UP';stCls='green';dotCls='up'}
+    else if(s.status==='error'){stTxt='ERR '+(s.http_status||'?');stCls='orange';dotCls='warn'}
+    else{stTxt='DOWN';stCls='bad';dotCls='dn'}
+    const latCls=s.status==='up'?(s.latency_ms<200?'green':s.latency_ms<500?'orange':'bad'):'bad';
+    const latTxt=s.status==='up'?s.latency_ms+'ms':(s.error||'—');
+    const ep=s.public||'local';
+    return `<tr><td>${esc(s.name)}</td><td class="${stCls}"><span class="dot ${dotCls}"></span>${stTxt}</td><td class="${latCls}">${latTxt}</td><td class="cmd">${esc(ep)}</td></tr>`;
+  }).join('')||'<tr><td colspan="4" class="empty">no services</td></tr>';
+}
+
+/* ── main render ────────────────────────────── */
 function render(d){
+  lastStats=d;lastTs=Date.now();
   $('hostLine').textContent=`${d.hostname} · ${d.os} · up ${fmtDur(d.uptime_s)}`;
-  $('fLeft').textContent=`PULSEBOARD v2 · ${d.hostname} · UPTIME ${fmtDur(d.uptime_s)} · ${OPT.poll/1000}s POLL`;
-  $('fRight').textContent=`last sync ${new Date(d.ts).toLocaleTimeString()} IST`;
+  $('fLeft').textContent=`PULSEBOARD v2 · ${d.hostname} · UPTIME ${fmtDur(d.uptime_s).replace(/ /g,'')} · ${OPT.poll/1000}s POLL · ${d.process_count} PROC`;
+  $('fRight').textContent=`last sync ${new Date(d.ts).toLocaleTimeString()}`;
+  $('expBtn').classList.remove('off');
 
   H.cpu.push(d.cpu_usage_pct);H.mem.push(d.mem.usage_pct);
   H.rx.push(d.net.total.rx_bps/1024);H.tx.push(d.net.total.tx_bps/1024);
@@ -541,51 +761,51 @@ function render(d){
   $('sNetD').querySelector('.v').textContent=fmtRate(d.net.total.rx_bps);
   $('sNetU').querySelector('.v').textContent=fmtRate(d.net.total.tx_bps);
 
-  $('mCores').textContent=d.cores;
-  $('mLoad1').textContent=d.loadavg[0];$('mLoad5').textContent=d.loadavg[1];$('mLoad15').textContent=d.loadavg[2];
-  $('mUp').textContent=fmtDur(d.uptime_s);
-  setBar($('memBar'),d.mem.usage_pct);
-  $('mMemUsed').textContent=fmtB(d.mem.used)+' / '+fmtB(d.mem.total);
-  $('mMemAvail').textContent=fmtB(d.mem.available);
-  $('mMemCache').textContent=fmtB(d.mem.buff_cache);
-  $('mMemTotal').textContent=fmtB(d.mem.total);
-  setBar($('swapBar'),d.mem.swap.usage_pct);
-  $('mSwapUsed').textContent=fmtB(d.mem.swap.used)+' / '+fmtB(d.mem.swap.total);
-  $('mSwapFree').textContent=fmtB(d.mem.swap.free);
-  $('mSwapTotal').textContent=fmtB(d.mem.swap.total);
+  renderSys(d);renderProc(d);renderMem(d);renderSwap(d);renderStor(d);
+  renderNet(d);renderIo(d);renderTop(d);renderDocker(d);renderSvc(d);
 
-  $('mNet').innerHTML=d.net.interfaces.map(n=>
-    `<div class="ifrow"><span class="n">${n.name}${n.link_mbps?` <span style="color:var(--faint)">${n.link_mbps}M</span>`:''}</span><span class="r">↓${fmtRate(n.rx_bps)}</span><span class="t">↑${fmtRate(n.tx_bps)}</span></div>`
-  ).join('')||'<div class="mrow"><span>no interfaces</span></div>';
-
-  $('ioBody').innerHTML=d.diskio.map(x=>
-    `<tr><td>${x.dev}</td><td class="green">${fmtRate(x.r_kbps*1024)}</td><td class="orange">${fmtRate(x.w_kbps*1024)}</td><td>${x.r_total_gb}G</td><td>${x.w_total_gb}G</td></tr>`
-  ).join('')||'<tr><td colspan="5" style="color:var(--faint)">no block devices</td></tr>';
-
-  $('procBody').innerHTML=d.procs.map(p=>
-    `<tr><td>${p.pid}</td><td>${p.name}</td><td class="gold">${p.cpu}%</td><td>${p.mem}%</td><td class="cmd">${p.cmd}</td></tr>`
-  ).join('');
-
-  const chips=(Array.isArray(d.docker)&&d.docker.length)?`<span class="chip"><span class="up">●</span> ${d.docker.length} containers up</span>`:'';
-  $('svcBox').innerHTML=SERVICES.map(s=>
-    `<span class="chip">${s.url?`<a href="${s.url}" target="_blank" rel="noopener">${s.name}</a>`:s.name}</span>`).join('')+chips;
-
-  const t=new Date().toLocaleTimeString();
+  pollN++;
   const status=d.cpu_usage_pct>=85?'<span class="w">HIGH LOAD</span>':d.mem.swap.usage_pct>=80?'<span class="w">SWAP PRESSURE</span>':'<span class="ok">OK</span>';
-  log.unshift(`<span class="t">[${t}]</span> poll #${H.cpu.length} · cpu ${d.cpu_usage_pct}% · mem ${d.mem.usage_pct}% · swap ${d.mem.swap.usage_pct}% · net ↓${fmtRate(d.net.total.rx_bps)} ↑${fmtRate(d.net.total.tx_bps)} · ${status}`);
+  log.unshift(`<span class="t">[${new Date().toLocaleTimeString()}]</span> poll #${pollN} · cpu ${d.cpu_usage_pct}% · mem ${d.mem.usage_pct}% · swap ${d.mem.swap.usage_pct}% · net ↓${fmtRate(d.net.total.rx_bps)} ↑${fmtRate(d.net.total.tx_bps)} · ${status}`);
   if(log.length>6)log.pop();
   $('logLines').innerHTML=log.map(l=>`<div class="line">${l}</div>`).join('');
 }
 
-const SERVICES=[
-  {name:'madhur.dev',url:'https://madhur.dev'},{name:'aa.madhur.dev',url:'https://aa.madhur.dev'},
-  {name:'ai.madhur.dev',url:'https://ai.madhur.dev'},{name:'meetings.madhur.dev',url:'https://meetings.madhur.dev'},
-  {name:'nav.madhur.dev',url:'https://nav.madhur.dev'},{name:'n8n.madhur.dev',url:'https://n8n.madhur.dev'},
-  {name:'ollama.madhur.dev',url:'https://ollama.madhur.dev'},{name:'docker.madhur.dev',url:'https://docker.madhur.dev'},
-  {name:'code.madhur.dev',url:'https://code.madhur.dev'},{name:'rdp.madhur.dev',url:'https://rdp.madhur.dev'},
-  {name:'Supabase'},{name:'OmniRoute'},{name:'Hermes'},
-];
+/* ── uptime ticker (client-side, 1s while live) ─ */
+function tickUptime(){
+  if(!lastStats)return;
+  const up=lastStats.uptime_s+Math.floor((Date.now()-lastTs)/1000);
+  $('mUp').textContent=fmtDur(up);
+  $('hostLine').textContent=`${lastStats.hostname} · ${lastStats.os} · up ${fmtDur(up)}`;
+  $('fLeft').textContent=`PULSEBOARD v2 · ${lastStats.hostname} · UPTIME ${fmtDur(up).replace(/ /g,'')} · ${OPT.poll/1000}s POLL · ${lastStats.process_count} PROC`;
+}
+function startUptime(){if(!upTimer)upTimer=setInterval(tickUptime,1000)}
+function stopUptime(){clearInterval(upTimer);upTimer=null}
 
+/* ── fullscreen ─────────────────────────────── */
+const ICON_FS='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
+const ICON_FSX='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>';
+function updateFsIcon(){$('fsBtn').innerHTML=document.fullscreenElement?ICON_FSX:ICON_FS}
+function toggleFs(){
+  if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+  else document.documentElement.requestFullscreen().catch(()=>{});
+}
+$('fsBtn').addEventListener('click',toggleFs);
+document.addEventListener('fullscreenchange',updateFsIcon);
+updateFsIcon();
+
+/* ── export ─────────────────────────────────── */
+$('expBtn').addEventListener('click',()=>{
+  if(!lastStats)return;
+  const blob=new Blob([JSON.stringify(lastStats,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`pulseboard-${lastStats.hostname}-${lastStats.ts.replace(/[:.]/g,'-')}.json`;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+});
+
+/* ── poll / stream control ──────────────────── */
 async function tick(){
   try{
     const r=await fetch('/api/stats',{cache:'no-store'});
@@ -593,35 +813,55 @@ async function tick(){
     render(await r.json());
   }catch(e){$('fRight').textContent='ERR '+e.message}
 }
+function logLine(txt,c){
+  return `<span class="t">[${new Date().toLocaleTimeString()}]</span> ${c?`<span class="${c}">${txt}</span>`:txt}`;
+}
+function renderLog(){$('logLines').innerHTML=log.map(l=>`<div class="line">${l}</div>`).join('')}
 function start(){
+  ['cpu','mem','rx','tx'].forEach(k=>H[k]=[]);
+  pollN=0;lastStats=null;lastTs=0;
+  $('expBtn').classList.add('off');
   btn.classList.remove('stop');btn.classList.add('live');
   btn.setAttribute('aria-pressed','true');label.textContent='STOP MONITOR';
   led.classList.add('live');ledTxt.textContent='LIVE';
   $('standby').classList.add('hidden');
   const d=$('dash');d.classList.remove('dim');
   d.querySelectorAll('.fadein').forEach((el,i)=>el.style.animationDelay=(i*70)+'ms');
-  log.unshift(`<span class="t">[${new Date().toLocaleTimeString()}]</span> <span class="ok">telemetry stream started</span>`);
-  tick();timer=setInterval(tick,OPT.poll);
+  log.unshift(logLine('telemetry stream started','ok'));
+  if(log.length>6)log.pop();
+  renderLog();
+  startUptime();
+  tick();
+  timer=setInterval(tick,OPT.poll);
 }
 function stop(){
   clearInterval(timer);timer=null;
+  stopUptime();
   btn.classList.remove('live','stop');btn.setAttribute('aria-pressed','false');
   label.textContent='START MONITOR';
   led.classList.remove('live');ledTxt.textContent='IDLE';
   $('standby').classList.remove('hidden');
   $('dash').classList.add('dim');
   $('fRight').textContent='stream stopped · idle';
-  log.unshift(`<span class="t">[${new Date().toLocaleTimeString()}]</span> <span class="w">telemetry stream halted — standby</span>`);
+  log.unshift(logLine('telemetry stream halted — standby','w'));
   if(log.length>6)log.pop();
-  $('logLines').innerHTML=log.map(l=>`<div class="line">${l}</div>`).join('');
+  renderLog();
 }
 btn.addEventListener('click',()=>timer?stop():start());
 
-/* init */
-applyTheme();renderSeg();bindOptions();
-fetch('/api/health').then(r=>r.json()).then(h=>{
-  $('fRight').textContent='idle · uplink online since '+new Date(h.ts).toLocaleTimeString();
-}).catch(()=>{});
+/* ── resize ─────────────────────────────────── */
+let rzT=null;
+window.addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(()=>{drawChart();drawSpark()},120)});
+
+/* ── init ───────────────────────────────────── */
+$('procSortTog').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  procSort=b.dataset.k;
+  document.querySelectorAll('#procSortTog button').forEach(x=>x.classList.toggle('sel',x.dataset.k===procSort));
+  if(lastStats)renderTop(lastStats);
+});
+bindOptions();
+applyOpts();
 </script>
 </body>
 </html>

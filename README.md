@@ -31,7 +31,10 @@ Version 2 is a full visual rebuild, not a recolor:
 - Micro-interactions: monitor press response, live LED pulse, hover lift, chart glow, staggered panel entrance.
 - `prefers-reduced-motion` respected. Zero dependencies kept — plain HTML/CSS/JS.
 - Redesigned with [emilkowalski/skills](https://github.com/pmadhurn/skills-for-ai) (emil-design-eng, apple-design, animate, pick-ui-library).
-- Options panel (gear icon or press `O`): theme presets (gold/emerald/violet/ember/mono), poll rate (1s/2s/5s), chart window (60s/90s/180s), per-series chart toggles. All persisted in localStorage.
+- Options panel (gear icon or press `O`): theme presets (gold/emerald/violet/ember/mono), poll rate (1s/2s/5s), chart window (60s/90s/180s), per-series chart toggles, compact mode. All persisted in localStorage.
+- Service health checks (SVC): live latency + UP/DOWN status for every deployed service (portfolio, ayurveda, open webui, speakinsights, navdashboard, n8n, ollama, portainer, vscode, omniroute, supabase).
+- Per-core CPU bars, per-mount storage bars, NET sparkline chart, system info card (IP, kernel, arch, cpu model, process count), Docker container table with health dots.
+- Fullscreen mode (⛶ button or press `F`), export snapshot as JSON (download button), process sort toggle (CPU/MEM), live ticking uptime counter.
 
 ## Run
 ```bash
