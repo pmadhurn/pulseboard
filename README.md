@@ -1,62 +1,43 @@
-# PulseBoard ♡
+# 💓 PulseBoard
 
-Zero-idle, on-demand server health dashboard. Press the button, watch the stats — and when you don't, it costs **nothing** (no background sampling, no daemons spinning).
+Self-hosted server monitoring dashboard — live at **https://health.madhur.dev**.
+Zero npm dependencies: one Node.js file + one HTML file.
 
-Live at: **https://health.madhur.dev**
+![status page](docs/v3-status-page.png)
 
-## Features
-- CPU usage % (1s delta from `/proc/stat`), load average, core count
-- Memory + Swap usage with bars
-- Storage utilisation per mount (`df`)
-- Network: live up/down throughput per interface + lifetime totals, link speed, sparkline chart
-- Disk I/O: read/write KB/s + lifetime totals (`/proc/diskstats`)
-- Top processes by CPU
-- Docker container list (cached 30s server-side)
-- Deployed-services directory (from obsidian deployment notes)
+## What it does (v3)
 
-## Design: zero idle cost
-- The server does **nothing** between requests. There are no samplers, no background intervals.
-- Stats are computed **only when the browser polls `/api/stats`** — i.e. only while you hold the dashboard's Monitor button on.
-- Network rates and CPU% use two `/proc` samples 1s apart, computed on demand.
-- No dependencies — plain Node.js `http` + `/proc` reads.
+- **Public status page** — anyone can see which services are up, latency, and 24h uptime.
+  Internal-only services are hidden unless unlocked.
+- **Full dashboard behind an access key** — CPU (per-core), memory, swap, load,
+  network, disk, docker containers with per-container CPU/mem, top processes, storage.
+- **24h history** — a background sampler ticks every 30s into a ring buffer
+  (persisted to `data/state.json`, survives restarts) and renders canvas charts
+  for CPU, mem/swap, network, and disk IO over 1h/6h/24h.
+- **Alert engine → Telegram** — sustained CPU/load, memory ≥92%, swap ≥85%,
+  disk ≥85%, service down/recovered (2-strike anti-flap), container stopped/started.
+  Alerts go to the in-dashboard feed and to Telegram via `/usr/local/bin/server-alert`,
+  with per-rule cooldowns.
 
-## Design
-Version 2 is a full visual rebuild, not a recolor:
-
-- Mission-control / telemetry-terminal layout with a command bar, status LED, standby prompt, live event log, and module grid.
-- Large real-time multi-series telemetry chart for CPU, memory, download, and upload.
-- Big live stat strip for CPU, memory, swap, disk, and network throughput.
-- Terminal-style modules for processor, memory, swap, network interfaces, disk I/O, top processes, and deployed services.
-- Professional dark palette: near-black graphite, warm gold, amber, emerald, violet — no blue hero theme.
-- Micro-interactions: monitor press response, live LED pulse, hover lift, chart glow, staggered panel entrance.
-- `prefers-reduced-motion` respected. Zero dependencies kept — plain HTML/CSS/JS.
-- Redesigned with [emilkowalski/skills](https://github.com/pmadhurn/skills-for-ai) (emil-design-eng, apple-design, animate, pick-ui-library).
-- Options panel (gear icon or press `O`): theme presets (gold/emerald/violet/ember/mono), poll rate (1s/2s/5s), chart window (60s/90s/180s), per-series chart toggles, compact mode. All persisted in localStorage.
-- Service health checks (SVC): live latency + UP/DOWN status for every deployed service (portfolio, ayurveda, open webui, speakinsights, navdashboard, n8n, ollama, portainer, vscode, omniroute, supabase).
-- Per-core CPU bars, per-mount storage bars, NET sparkline chart, system info card (IP, kernel, arch, cpu model, process count), Docker container table with health dots.
-- Fullscreen mode (⛶ button or press `F`), export snapshot as JSON (download button), process sort toggle (CPU/MEM), live ticking uptime counter.
+![full dashboard](docs/v3-full-dashboard.png)
 
 ## Run
+
 ```bash
-node server.js            # listens on 127.0.0.1:8123
-# or
 PULSEBOARD_PORT=8123 PULSEBOARD_HOST=127.0.0.1 node server.js
 ```
 
-## Systemd (this server)
-`/etc/systemd/system/pulseboard.service` → `systemctl start pulseboard`
+Config via env (or an `EnvironmentFile` in systemd):
 
-## Cloudflare Tunnel
-Ingress in `/etc/cloudflared/config.yml` (before the `http_status:404` catch-all):
-```yaml
-- hostname: health.madhur.dev
-  service: http://localhost:8123
-```
-Then `cloudflared tunnel route dns 46dac571-1095-4f5d-b552-ea8b7ca0fddd health.madhur.dev` and restart cloudflared.
+| var | meaning |
+|---|---|
+| `PULSEBOARD_TOKEN` | access key for the full dashboard APIs; unset = everything open |
+| `PULSEBOARD_TELEGRAM` | `0` disables Telegram alerts (feed still works) |
+| `PULSEBOARD_PORT` / `PULSEBOARD_HOST` | listen address (default `127.0.0.1:8123`) |
 
-## API
-- `GET /api/stats` — full snapshot (JSON)
-- `GET /api/health` — lightweight liveness
+Endpoints: `/api/health` and `/api/services` are public; `/api/stats`,
+`/api/history?hours=N`, `/api/alerts`, `/api/docker` require the token
+(`x-pb-token` header, `Authorization: Bearer`, or `?token=`).
 
-## License
-MIT
+Deployed as a systemd unit (`pulseboard.service`) behind a Cloudflare tunnel.
+Edit `SERVICE_CHECKS` in `server.js` to monitor your own services.
