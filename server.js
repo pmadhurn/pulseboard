@@ -213,6 +213,7 @@ const SERVICE_CHECKS = [
   { name: 'Portainer', url: 'http://127.0.0.1:9000/', public: 'docker.madhur.dev' },
   { name: 'VS Code', url: 'http://127.0.0.1:8082/', public: 'code.madhur.dev' },
   { name: 'FileDrop', url: 'http://127.0.0.1:8140/api/health', public: 'link.madhur.dev' },
+  { name: 'Learn', url: 'http://127.0.0.1:8131/api/health', public: 'learn.madhur.dev' },
   { name: 'PulseBoard', url: `http://127.0.0.1:${PORT}/api/health`, public: 'health.madhur.dev', self: true },
   { name: 'OmniRoute', url: 'http://127.0.0.1:20128/v1/models', public: null },
   { name: 'Supabase', url: 'http://127.0.0.1:8000/', public: null },
