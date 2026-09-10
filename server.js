@@ -54,6 +54,21 @@ const httpGet = (url, timeoutMs = 4000) => new Promise((resolve) => {
   req.on('timeout', () => { req.destroy(); });
 });
 
+/* Non-HTTP probe: JSON state file written by the service ({pid, gateway_state}).
+   Up = state says running AND that pid is alive. Mirrors httpGet's return shape. */
+function checkStateFile(file) {
+  const start = Date.now();
+  try {
+    const st = JSON.parse(fs.readFileSync(file, 'utf8'));
+    let alive = false;
+    try { process.kill(st.pid, 0); alive = true; } catch { alive = false; }
+    const ok = alive && st.gateway_state === 'running';
+    return { ok, status: ok ? 200 : 0, latency: Date.now() - start, error: ok ? null : (!alive ? 'pid-dead' : `state=${st.gateway_state}`) };
+  } catch (e) {
+    return { ok: false, status: 0, latency: Date.now() - start, error: e.code || 'state-file' };
+  }
+}
+
 /* ---------------- /proc readers ---------------- */
 
 function readProc(p) { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } }
@@ -197,10 +212,12 @@ const SERVICE_CHECKS = [
   { name: 'Ollama', url: 'http://127.0.0.1:11434/api/tags', public: 'ollama.madhur.dev' },
   { name: 'Portainer', url: 'http://127.0.0.1:9000/', public: 'docker.madhur.dev' },
   { name: 'VS Code', url: 'http://127.0.0.1:8082/', public: 'code.madhur.dev' },
+  { name: 'FileDrop', url: 'http://127.0.0.1:8140/api/health', public: 'link.madhur.dev' },
   { name: 'PulseBoard', url: `http://127.0.0.1:${PORT}/api/health`, public: 'health.madhur.dev', self: true },
   { name: 'OmniRoute', url: 'http://127.0.0.1:20128/v1/models', public: null },
   { name: 'Supabase', url: 'http://127.0.0.1:8000/', public: null },
-  { name: 'Hermes', url: 'http://127.0.0.1:33435/', public: null },
+  // Hermes gateway has no HTTP port (ACP is stdio); probe its state file + pid instead.
+  { name: 'Hermes', stateFile: '/home/ubuntu/.hermes/gateway_state.json', public: null },
 ];
 
 /* ---------------- persistent state ---------------- */
@@ -273,8 +290,10 @@ function evaluateAlerts(point, mem) {
 
 function evaluateDiskAlerts(disks) {
   for (const d of disks) {
-    if (d.use_pct >= 85) {
-      pushAlert(d.use_pct >= 93 ? 'crit' : 'warn', `disk-${d.mount}`,
+    // 2026-08-23: lowered 85->78 (crit 93->90). Disk grows ~1%/day here, so the old
+    // window gave only ~8 days of warning and the 81% creep went unannounced entirely.
+    if (d.use_pct >= 78) {
+      pushAlert(d.use_pct >= 90 ? 'crit' : 'warn', `disk-${d.mount}`,
         `Disk ${d.mount} at ${d.use_pct}% (${fmtBytes(d.avail)} free)`, 6 * 3600_000);
     }
   }
@@ -296,7 +315,7 @@ let prevRunning = null;       // Set of running container names
 
 async function refreshServices() {
   const results = await Promise.all(SERVICE_CHECKS.map(async (svc) => {
-    const r = await httpGet(svc.url, 4000);
+    const r = svc.stateFile ? checkStateFile(svc.stateFile) : await httpGet(svc.url, 4000);
     return { svc, r };
   }));
   for (const { svc, r } of results) {

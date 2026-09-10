@@ -103,8 +103,15 @@ tr:last-child td{border-bottom:0}
 .lock input:focus{outline:none;border-color:var(--accent)}
 .err{color:var(--down);font-size:12px;min-height:16px;margin-bottom:6px}
 footer{color:var(--muted);font-size:12px;text-align:center;padding:26px 0 14px}
+footer a{display:inline-block;padding:6px 4px;margin:-6px -4px}
 .hidden{display:none!important}
-@media(max-width:640px){ header h1{font-size:17px} .card .big{font-size:21px} }
+@media(max-width:640px){
+  header h1{font-size:17px}
+  .card .big{font-size:21px}
+  .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .scroll-x th,.scroll-x td{white-space:nowrap}
+  .scroll-x td{max-width:260px;overflow:hidden;text-overflow:ellipsis}
+}
 </style>
 </head>
 <body>
