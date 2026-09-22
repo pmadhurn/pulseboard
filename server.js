@@ -215,6 +215,8 @@ const SERVICE_CHECKS = [
   { name: 'FileDrop', url: 'http://127.0.0.1:8140/api/health', public: 'link.madhur.dev' },
   { name: 'Learn', url: 'http://127.0.0.1:8131/api/health', public: 'learn.madhur.dev' },
   { name: 'PulseBoard', url: `http://127.0.0.1:${PORT}/api/health`, public: 'health.madhur.dev', self: true },
+  { name: 'Vault', url: 'http://127.0.0.1:8150/healthz', public: null },
+  { name: 'Read', url: 'http://127.0.0.1:8160/healthz', public: 'read.madhur.dev' },
   { name: 'OmniRoute', url: 'http://127.0.0.1:20128/v1/models', public: null },
   { name: 'Supabase', url: 'http://127.0.0.1:8000/', public: null },
   // Hermes gateway has no HTTP port (ACP is stdio); probe its state file + pid instead.
